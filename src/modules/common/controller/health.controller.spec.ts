@@ -1,4 +1,3 @@
-import { ExecutionContext } from '@nestjs/common';
 import { HealthCheckService, PrismaHealthIndicator } from '@nestjs/terminus';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../provider';
@@ -24,7 +23,7 @@ describe('HealthController', () => {
       ],
     })
       .overrideGuard(HealthGuard) // We bypass the guard in unit tests
-      .useValue({ canActivate: (_context: ExecutionContext) => true })
+      .useValue({ canActivate: () => true })
       .compile();
 
     controller = module.get<HealthController>(HealthController);
