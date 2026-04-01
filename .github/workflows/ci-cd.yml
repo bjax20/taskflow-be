@@ -84,6 +84,7 @@ jobs:
             cat > .env << EOF
             NODE_ENV=production
             API_PORT=${{ secrets.API_PORT }}
+            API_PREFIX=${{ secrets.API_PREFIX }}
             HEALTH_TOKEN=${{ secrets.HEALTH_TOKEN }}
             MYSQL_DATABASE=taskflow_db
             MYSQL_ROOT_PASSWORD=${{ secrets.DB_ROOT_PASSWORD }}
@@ -93,7 +94,7 @@ jobs:
             EOF
 
             echo "✅ .env created. Verifying keys..."
-            grep -E "API_PORT|DATABASE_URL" .env | sed 's/=.*//' | sed 's/^/Found Variable: /'
+            grep -E "API_PORT|API_PREFIX|DATABASE_URL" .env | sed 's/=.*//' | sed 's/^/Found Variable: /'
             
             echo "=== 📦 STEP 2: Refreshing Containers ==="
             docker pull billjerson/taskflow-backend:latest
