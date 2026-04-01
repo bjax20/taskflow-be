@@ -87,6 +87,9 @@ jobs:
             API_PREFIX=${{ secrets.API_PREFIX }}
             HEALTH_TOKEN=${{ secrets.HEALTH_TOKEN }}
             SWAGGER_ENABLE=${{ secrets.SWAGGER_ENABLE }}
+            # Auth Configuration
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            JWT_ISSUER=${{ secrets.JWT_ISSUER }}
             MYSQL_DATABASE=taskflow_db
             MYSQL_ROOT_PASSWORD=${{ secrets.DB_ROOT_PASSWORD }}
             MYSQL_USER=dev_user
@@ -95,7 +98,7 @@ jobs:
             EOF
 
             echo "✅ .env created. Verifying keys..."
-            grep -E "API_PORT|API_PREFIX|SWAGGER_ENABLE|DATABASE_URL" .env | sed 's/=.*//' | sed 's/^/Found Variable: /'
+            grep -E "API_PORT|API_PREFIX|JWT_SECRET|DATABASE_URL" .env | sed 's/=.*//' | sed 's/^/Injected: /'
             
             echo "=== 📦 STEP 2: Refreshing Containers ==="
             docker pull billjerson/taskflow-backend:latest
@@ -114,7 +117,7 @@ jobs:
             MAX_API_ATTEMPTS=20
             API_ATTEMPT=0
             set +e
-            until docker-compose exec -T api curl -s http://localhost:${{ secrets.API_PORT }}/health -H "Authorization: Bearer ${{ secrets.HEALTH_TOKEN }}" &> /dev/null; do
+            until docker-compose exec -T api curl -s http://localhost:${{ secrets.API_PORT }}${{ secrets.API_PREFIX }}/health -H "Authorization: Bearer ${{ secrets.HEALTH_TOKEN }}" &> /dev/null; do
               API_ATTEMPT=$((API_ATTEMPT + 1))
               if [ $API_ATTEMPT -ge $MAX_API_ATTEMPTS ]; then
                 echo "❌ API Health Check Failed on Port ${{ secrets.API_PORT }}"
