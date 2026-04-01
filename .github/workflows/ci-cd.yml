@@ -58,6 +58,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Copy docker-compose.yml to VPS via SCP
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "docker-compose.yml"
+          target: "~/taskflow-backend/"
+
       - name: Deploy to Singapore VPS via SSH
         uses: appleboy/ssh-action@master
         with:
@@ -77,10 +86,6 @@ jobs:
             echo "Saving current image state for rollback..."
             OLD_IMAGE=$(docker inspect --format='{{.ID}}' ${{ secrets.DOCKER_USERNAME }}/taskflow-backend:latest 2>/dev/null || echo "none")
             echo "Old image: $OLD_IMAGE"
-            
-            # Copy docker-compose.yml from repo to VPS
-            echo "Copying docker-compose.yml..."
-            cp ${{ github.workspace }}/docker-compose.yml ~/taskflow-backend/
             
             # Create .env file on VPS
             echo "Creating .env file..."
