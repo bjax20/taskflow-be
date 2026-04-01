@@ -1,31 +1,38 @@
+version: "3.9"
+
 services:
   db:
     image: mysql:8.0
     container_name: taskflow_db
     restart: always
     environment:
-      # These now pull from the .env file created by GitHub Actions
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
-      - '3306:3306'
+      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   api:
     image: billjerson/taskflow-backend:latest
     container_name: taskflow_api
     restart: always
     ports:
-      - '3000:3000'
+      - "3000:3000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy   # ensure db is healthy
     env_file:
       - .env
     environment:
-      # Use the variable from .env
       DATABASE_URL: ${DATABASE_URL}
 
 volumes:
