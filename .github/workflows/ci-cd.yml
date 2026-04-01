@@ -78,6 +78,14 @@ jobs:
             
             echo "=== Starting Deployment ==="
             
+            # Install docker-compose if not present
+            if ! command -v docker-compose &> /dev/null; then
+              echo "Installing docker-compose..."
+              sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+              sudo chmod +x /usr/local/bin/docker-compose
+              echo "✅ docker-compose installed"
+            fi
+            
             # Create directory
             mkdir -p ~/taskflow-backend
             cd ~/taskflow-backend
