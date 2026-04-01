@@ -4,17 +4,17 @@ services:
     container_name: taskflow_db
     restart: always
     environment:
-      MYSQL_DATABASE: taskflow_db
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_USER: dev_user
-      MYSQL_PASSWORD: dev_password
+      # These now pull from the .env file created by GitHub Actions
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - '3306:3306'
     volumes:
       - mysql_data:/var/lib/mysql
 
   api:
-    # Use the image built by GitHub Actions
     image: billjerson/taskflow-backend:latest
     container_name: taskflow_api
     restart: always
@@ -22,9 +22,11 @@ services:
       - '3000:3000'
     depends_on:
       - db
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: "mysql://dev_user:dev_password@db:3306/taskflow_db"
-    # REMOVED volumes for production; the code is already inside the image
+      # Use the variable from .env
+      DATABASE_URL: ${DATABASE_URL}
 
 volumes:
   mysql_data:
