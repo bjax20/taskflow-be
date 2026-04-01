@@ -33,7 +33,7 @@ RUN npm prune --omit=dev
 FROM node:20.19.0-alpine
 
 # Install openssl for runtime
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl curl
 
 WORKDIR /app
 
