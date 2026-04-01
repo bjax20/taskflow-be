@@ -1,43 +1,43 @@
-# PRODUCTION DOCKERFILE
-# ---------------------
-# This Dockerfile allows to build a Docker image of the NestJS application
-# and based on a NodeJS 20 image. The multi-stage mechanism allows to build
-# the application in a "builder" stage and then create a lightweight production
-# image containing the required dependencies and the JS build files.
-# 
-# Dockerfile best practices
-# https://docs.docker.com/develop/develop-images/dockerfile_best-practices/
-# Dockerized NodeJS best practices
-# https://github.com/nodejs/docker-node/blob/master/docs/BestPractices.md
-# https://www.bretfisher.com/node-docker-good-defaults/
-# http://goldbergyoni.com/checklist-best-practice-of-node-js-in-production/
+# Build a "virtual laptop" and call it "builder" (separation of concerns)
+FROM node:22-alpine AS builder
 
-FROM node:20-alpine as builder
+# Install openssl for Prisma (Required for Alpine)
+RUN apk add --no-cache openssl
 
-ENV NODE_ENV build
+WORKDIR /usr/src/app
 
-USER node
-WORKDIR /home/node
-
+# Copy configuration files
 COPY package*.json ./
+COPY prisma ./prisma/
+
+# Install ALL dependencies (including devDeps for the build)
 RUN npm ci
 
-COPY --chown=node:node . .
-RUN npx prisma generate \
-    && npm run build \
-    && npm prune --omit=dev
+# Copy source code and generate Prisma Client
+COPY . .
+RUN npx prisma generate
+RUN npm run build
+
+# Remove dev dependencies to keep the image small
+RUN npm prune --omit=dev
 
 # ---
 
-FROM node:20-alpine
+# STAGE 2 - Build another "virtual laptop" (or image) set up the files by copying files from the "builder" laptop.
+FROM node:22-alpine 
 
-ENV NODE_ENV production
+# Install openssl for Prisma runtime
+RUN apk add --no-cache openssl
+
+ENV NODE_ENV=production
 
 USER node
-WORKDIR /home/node
+WORKDIR /usr/src/app
 
-COPY --from=builder --chown=node:node /home/node/package*.json ./
-COPY --from=builder --chown=node:node /home/node/node_modules/ ./node_modules/
-COPY --from=builder --chown=node:node /home/node/dist/ ./dist/
+# Copy necessary files from builder ("virtual laptop 1")
+COPY --from=builder /usr/src/app/package*.json ./
+COPY --from=builder /usr/src/app/node_modules ./node_modules
+COPY --from=builder /usr/src/app/dist ./dist
+COPY --from=builder /usr/src/app/prisma ./prisma
 
-CMD ["node", "dist/server.js"]
+CMD ["node", "dist/main.js"] 

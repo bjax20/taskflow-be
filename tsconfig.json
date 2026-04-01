@@ -12,13 +12,17 @@
     "allowJs": true,
     "outDir": "./dist",
     "strictNullChecks": true,
-    "noUnusedLocals": true
+    "noUnusedLocals": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
   },
   "include": [
     "src/**/*"
   ],
   "exclude": [
     "node_modules",
-    "**/*.spec.ts",
+    "dist",
+    "**/*.spec.ts"
   ]
 }

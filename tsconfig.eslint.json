@@ -1,8 +1,10 @@
 {
-  "extends": "./tsconfig",
+  "extends": "./tsconfig.json",
   "include": [
     "src/**/*",
+    "prisma/**/*",
     "**/*.spec.ts",
+    ".eslintrc.js"
   ],
   "exclude": [
     "node_modules",

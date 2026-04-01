@@ -1,0 +1,68 @@
+name: Taskflow CI/CD
+
+on:
+  push:
+    branches: [ main ]  
+  pull_request:
+    branches: [ main ]  
+
+jobs:
+  #  The "Quality Gate" (CI)
+  test-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Lint
+        run: npm run lint
+
+      - name: Run Tests (TDD Strict)
+        run: npm run test
+        env:
+          DATABASE_URL: mysql://root:password@localhost:3306/taskflow_test
+
+  # The "Delivery" (Build & Push Docker)
+  build-docker:
+    needs: test-and-lint
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/taskflow-backend:latest
+
+  # The "Deployment" (CD)
+  deploy:
+    needs: build-docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Singapore VPS via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd ~/taskflow-backend
+            docker pull ${{ secrets.DOCKER_USERNAME }}/taskflow-backend:latest
+            docker-compose up -d
+            docker image prune -f

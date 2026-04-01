@@ -1,21 +1,35 @@
-# THIS DOCKERFILE IS INTENDED FOR DEVELOPMENT ENVIRONMENTS
-# DO NOT USE THIS FOR PRODUCTION USAGES.
-
-version: '3'
-
 services:
-  postgresql:
-    image: docker.io/bitnami/postgresql:16
-    ports:
-      - '5432:5432'
-    volumes:
-      - 'postgresql_data:/bitnami/postgresql'
+  # The Database Service
+  db:
+    image: mysql:8.0
+    container_name: taskflow_db
+    restart: always
     environment:
-      - ALLOW_EMPTY_PASSWORD=yes
-      - POSTGRESQL_DATABASE=nestjs
-      - POSTGRESQL_USERNAME=nestjs
-      - POSTGRESQL_PASSWORD=password
+      MYSQL_DATABASE: taskflow_db
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_USER: dev_user
+      MYSQL_PASSWORD: dev_password
+    ports:
+      - '3306:3306' # Map to host so DBeaver can connect to localhost:3306
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  # The NestJS Backend Service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskflow_api
+    ports:
+      - '3000:3000'
+    depends_on:
+      - db
+    environment:
+      # Use the service name 'db' as the hostname for internal Docker communication
+      DATABASE_URL: "mysql://dev_user:dev_password@db:3306/project_management_db"
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
 
 volumes:
-  postgresql_data:
-    driver: local
+  mysql_data:

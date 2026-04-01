@@ -15,8 +15,7 @@ export const configProvider = {
             SWAGGER_ENABLE: Joi.number().required(),
             JWT_SECRET: Joi.string().required(),
             JWT_ISSUER: Joi.string().required(),
-            HEALTH_TOKEN: Joi.string().required(),
-            PASSENGERS_ALLOWED: Joi.string().valid('yes', 'no').required()
+            HEALTH_TOKEN: Joi.string().required()
         });
 
         const result = validationSchema.validate(env);

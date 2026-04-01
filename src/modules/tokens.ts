@@ -1,19 +1,15 @@
 /**
- * These tokens can be used for NestJS custom providers. For each required
- * custom provider, declare a new string below and use in the whole application.
- *
- * @see https://docs.nestjs.com/fundamentals/custom-providers
+ * These tokens are used for NestJS custom providers.
+ * They prevent "Magic Strings" and ensure Type Safety across the app.
  */
 export enum Service {
-
-    STORAGE = 'storage.service',
-
     CONFIG = 'config.service',
-
+    STORAGE = 'storage.service',
+    // Add others as you build your Taskflow features
 }
 
 export enum Role {
-
-    RESTRICTED = 'restricted'
-
+    ADMIN = 'admin',
+    USER = 'user',
+    MANAGER = 'manager'
 }
