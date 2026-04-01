@@ -51,7 +51,7 @@ jobs:
           tags: ${{ secrets.DOCKER_USERNAME }}/taskflow-backend:latest
 
   # The "Deployment" (CD) - WITH HEALTH CHECKS & ROLLBACK
-# The "Deployment" (CD) - STAYS ALIVE ON FAILURE
+  # The "Deployment" (CD) - STAYS ALIVE ON FAILURE
   deploy:
     needs: build-docker
     if: github.event_name == 'push'
@@ -75,17 +75,20 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            set -e
+            # 1. Exit on error, but we'll handle the health check manually
+            set -e 
             
-            echo "=== Starting Deployment ==="
+            echo "=== 🚀 Starting Deployment ==="
             mkdir -p ~/taskflow-backend
             cd ~/taskflow-backend
             
+            # 2. Inject ALL necessary variables
             echo "Creating .env file..."
-            cat > ~/taskflow-backend/.env << EOF
+            cat > .env << EOF
             DATABASE_URL="mysql://dev_user:dev_password@db:3306/taskflow_db"
             HEALTH_TOKEN=${{ secrets.HEALTH_TOKEN }}
             NODE_ENV=production
+            API_PORT=3000
             EOF
             
             echo "Pulling latest Docker image..."
@@ -95,35 +98,46 @@ jobs:
             docker-compose down || true
             docker-compose up -d
             
-            # ===== HEALTH CHECK LOOP =====
-            echo "=== Waiting for API to be ready ==="
+            # 3. Pre-flight Check: Ensure curl exists in the container
+            echo "Checking container health-check readiness..."
+            if ! docker-compose exec -T api which curl &> /dev/null; then
+               echo "❌ FATAL: 'curl' not found in container. Health check will always fail."
+               echo "Debug: Printing API logs immediately..."
+               docker-compose logs api
+               exit 1
+            fi
+
+            # 4. Smart Health Check Loop
+            echo "=== ⏳ Waiting for API to be ready ==="
             MAX_ATTEMPTS=20
             ATTEMPT=0
             
+            # Use 'set +e' so the loop doesn't kill the script when curl fails
+            set +e
             until docker-compose exec -T api curl -s http://localhost:3000/health -H "Authorization: Bearer ${{ secrets.HEALTH_TOKEN }}" &> /dev/null; do
               ATTEMPT=$((ATTEMPT + 1))
               
               if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
                 echo "❌ API failed to start after $MAX_ATTEMPTS attempts"
-                
-                echo "=== DEBUG: PRINTING API LOGS ==="
+                echo "=== 📄 CRITICAL: LAST 100 LINES OF API LOGS ==="
                 docker-compose logs --tail=100 api
-                
-                echo "⚠️ KEEPING CONTAINERS ALIVE FOR DEBUGGING ⚠️"
-                echo "SSH into your VPS now and run: docker logs taskflow_api"
-                
-                # We stop the script here so GitHub shows a failure, 
-                # but we DO NOT run docker-compose down.
+                echo "⚠️ CONTAINERS REMAIN ACTIVE FOR INVESTIGATION ⚠️"
                 exit 1
               fi
               
-              echo "API not ready... Attempt $ATTEMPT/$MAX_ATTEMPTS"
+              echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: API still warming up..."
               sleep 3
             done
+            set -e # Re-enable exit on error
 
-            echo "✅ API is ready!"
+            echo "✅ API is ready and healthy!"
             
+            # 5. Migration Check
             echo "Running Prisma migrations..."
-            docker-compose exec -T api npx prisma migrate deploy
+            if ! docker-compose exec -T api npx prisma migrate deploy; then
+               echo "❌ Prisma Migration Failed!"
+               docker-compose logs --tail=50 api
+               exit 1
+            fi
             
-            echo "=== ✅ Deployment Successful ==="
+            echo "=== 🎉 ✅ Deployment Successful ==="
