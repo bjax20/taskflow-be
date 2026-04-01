@@ -1,5 +1,4 @@
 services:
-  # The Database Service
   db:
     image: mysql:8.0
     container_name: taskflow_db
@@ -10,26 +9,22 @@ services:
       MYSQL_USER: dev_user
       MYSQL_PASSWORD: dev_password
     ports:
-      - '3306:3306' # Map to host so DBeaver can connect to localhost:3306
+      - '3306:3306'
     volumes:
       - mysql_data:/var/lib/mysql
 
-  # The NestJS Backend Service
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # Use the image built by GitHub Actions
+    image: billjerson/taskflow-backend:latest
     container_name: taskflow_api
+    restart: always
     ports:
       - '3000:3000'
     depends_on:
       - db
     environment:
-      # Use the service name 'db' as the hostname for internal Docker communication
-      DATABASE_URL: "mysql://dev_user:dev_password@db:3306/project_management_db"
-    volumes:
-      - .:/usr/src/app
-      - /usr/src/app/node_modules
+      DATABASE_URL: "mysql://dev_user:dev_password@db:3306/taskflow_db"
+    # REMOVED volumes for production; the code is already inside the image
 
 volumes:
   mysql_data:
