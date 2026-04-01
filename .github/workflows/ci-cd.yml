@@ -51,6 +51,7 @@ jobs:
           tags: ${{ secrets.DOCKER_USERNAME }}/taskflow-backend:latest
 
   # The "Deployment" (CD) - WITH HEALTH CHECKS & ROLLBACK
+# The "Deployment" (CD) - STAYS ALIVE ON FAILURE
   deploy:
     needs: build-docker
     if: github.event_name == 'push'
@@ -58,7 +59,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Copy docker-compose.yml to VPS via SCP
+      - name: Copy docker-compose.yml to VPS
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -74,28 +75,12 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            set -e  # Exit on first error
+            set -e
             
             echo "=== Starting Deployment ==="
-            
-            # Install docker-compose if not present
-            if ! command -v docker-compose &> /dev/null; then
-              echo "Installing docker-compose..."
-              sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-              sudo chmod +x /usr/local/bin/docker-compose
-              echo "✅ docker-compose installed"
-            fi
-            
-            # Create directory
             mkdir -p ~/taskflow-backend
             cd ~/taskflow-backend
             
-            # Save current image hash BEFORE pulling (for rollback)
-            echo "Saving current image state for rollback..."
-            OLD_IMAGE=$(docker inspect --format='{{.ID}}' ${{ secrets.DOCKER_USERNAME }}/taskflow-backend:latest 2>/dev/null || echo "none")
-            echo "Old image: $OLD_IMAGE"
-            
-            # Create .env file on VPS
             echo "Creating .env file..."
             cat > ~/taskflow-backend/.env << EOF
             DATABASE_URL="mysql://dev_user:dev_password@db:3306/taskflow_db"
@@ -103,76 +88,42 @@ jobs:
             NODE_ENV=production
             EOF
             
-            # Pull latest image
             echo "Pulling latest Docker image..."
             docker pull ${{ secrets.DOCKER_USERNAME }}/taskflow-backend:latest
             
-            # Stop old containers (if running)
-            echo "Stopping old containers..."
+            echo "Restarting Containers..."
             docker-compose down || true
-            
-            # Start new containers
-            echo "Starting new containers..."
             docker-compose up -d
             
-            # ===== HEALTH CHECK (Feature #6) =====
-            echo "=== Waiting for MySQL to be ready ==="
-            MAX_ATTEMPTS=30
-            ATTEMPT=0
-            
-            until docker-compose exec -T db mysqladmin ping -h localhost -u root -prootpassword &> /dev/null; do
-              ATTEMPT=$((ATTEMPT + 1))
-              if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
-                echo "❌ MySQL failed to start after $MAX_ATTEMPTS attempts"
-                echo "=== ROLLBACK INITIATED ==="
-                docker-compose down
-                if [ "$OLD_IMAGE" != "none" ]; then
-                  echo "Rolling back to previous image: $OLD_IMAGE"
-                  docker rmi ${{ secrets.DOCKER_USERNAME }}/taskflow-backend:latest || true
-                fi
-                exit 1
-              fi
-              echo "MySQL not ready yet... Attempt $ATTEMPT/$MAX_ATTEMPTS"
-              sleep 2
-            done
-            echo "✅ MySQL is ready!"
-            
-            # Wait a bit more for API to be ready
+            # ===== HEALTH CHECK LOOP =====
             echo "=== Waiting for API to be ready ==="
+            MAX_ATTEMPTS=20
             ATTEMPT=0
+            
             until docker-compose exec -T api curl -s http://localhost:3000/health -H "Authorization: Bearer ${{ secrets.HEALTH_TOKEN }}" &> /dev/null; do
               ATTEMPT=$((ATTEMPT + 1))
-              if [ $ATTEMPT -ge 30 ]; then
-                echo "❌ API failed to start"
-                echo "=== ROLLBACK INITIATED ==="
-                docker-compose down
-                if [ "$OLD_IMAGE" != "none" ]; then
-                  echo "Rolling back to previous image: $OLD_IMAGE"
-                  docker rmi ${{ secrets.DOCKER_USERNAME }}/taskflow-backend:latest || true
-                fi
+              
+              if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+                echo "❌ API failed to start after $MAX_ATTEMPTS attempts"
+                
+                echo "=== DEBUG: PRINTING API LOGS ==="
+                docker-compose logs --tail=100 api
+                
+                echo "⚠️ KEEPING CONTAINERS ALIVE FOR DEBUGGING ⚠️"
+                echo "SSH into your VPS now and run: docker logs taskflow_api"
+                
+                # We stop the script here so GitHub shows a failure, 
+                # but we DO NOT run docker-compose down.
                 exit 1
               fi
-              echo "API not ready yet... Attempt $ATTEMPT/30"
-              sleep 2
+              
+              echo "API not ready... Attempt $ATTEMPT/$MAX_ATTEMPTS"
+              sleep 3
             done
+
             echo "✅ API is ready!"
             
-            # Run migrations
             echo "Running Prisma migrations..."
-            if ! docker-compose exec -T api npx prisma migrate deploy; then
-              echo "❌ Migration failed"
-              echo "=== ROLLBACK INITIATED ==="
-              docker-compose down
-              if [ "$OLD_IMAGE" != "none" ]; then
-                echo "Rolling back to previous image: $OLD_IMAGE"
-                docker rmi ${{ secrets.DOCKER_USERNAME }}/taskflow-backend:latest || true
-              fi
-              exit 1
-            fi
-            echo "✅ Migrations completed!"
-            
-            # Cleanup old images
-            echo "Cleaning up old images..."
-            docker image prune -f
+            docker-compose exec -T api npx prisma migrate deploy
             
             echo "=== ✅ Deployment Successful ==="
