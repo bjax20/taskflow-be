@@ -1,9 +1,8 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-
-import { ApplicationModule } from './modules/app.module';
+import { AppModule } from './modules/app.module';
 import { CommonModule, LogInterceptor } from './modules/common';
 
 /**
@@ -53,7 +52,7 @@ function createSwagger(app: INestApplication) {
 async function bootstrap(): Promise<void> {
 
     const app = await NestFactory.create<NestFastifyApplication>(
-        ApplicationModule,
+        AppModule,
         new FastifyAdapter()
     );
 
@@ -67,7 +66,7 @@ async function bootstrap(): Promise<void> {
 
     const logInterceptor = app.select(CommonModule).get(LogInterceptor);
     app.useGlobalInterceptors(logInterceptor);
-
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
     await app.listen(process.env.API_PORT || API_DEFAULT_PORT, '0.0.0.0');
 }
 

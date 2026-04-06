@@ -1,0 +1,399 @@
+import {
+    Injectable,
+    NotFoundException,
+    ForbiddenException,
+    ConflictException,
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { AddMemberResponse } from "../common/interfaces/add-member-response.interface";
+import { PaginatedResponse } from "../common/interfaces/pagination.interface";
+import { CreateProjectDto } from "./dto/request/create-project.dto";
+import { UpdateProjectDto } from "./dto/request/update-project.dto";
+import { ProjectDetailResponseDto } from "./dto/response/project-detail/project-detail-response.dto";
+import { ProjectResponseDto } from "./dto/response/project-list/project-response.dto";
+import { ProjectMemberDto } from "./dto/response/project-member.dto";
+
+const projectInclude = {
+    members: true,
+    owner: { select: { id: true, email: true } },
+    tasks: true,
+} satisfies Prisma.ProjectInclude;
+
+// Define the shape of the include
+const projectMemberInclude = {
+    owner: {
+        select: { id: true, email: true },
+    },
+    members: {
+        include: {
+            user: {
+                select: { id: true, email: true },
+            },
+        },
+    },
+} satisfies Prisma.ProjectInclude;
+
+type ProjectWithMembersAndOwner = Prisma.ProjectGetPayload<{
+    include: typeof projectMemberInclude;
+}>;
+
+// Define the inclusion once
+const projectDetailInclude = {
+    owner: { select: { id: true, email: true } },
+    members: {
+        include: {
+            user: { select: { id: true, email: true } },
+        },
+    },
+    tasks: true,
+} satisfies Prisma.ProjectInclude;
+
+// Create the type that the helper method uses
+type ProjectWithDetail = Prisma.ProjectGetPayload<{
+    include: typeof projectDetailInclude;
+}>;
+
+
+@Injectable()
+export class ProjectsService {
+    public constructor(private readonly prisma: PrismaService) { }
+
+    /**
+     * Create a new project
+     */
+    public async create(
+        createProjectDto: CreateProjectDto,
+        userId: number,
+    ): Promise<ProjectDetailResponseDto> {
+        // Check if project with same title already exists for this user
+        const existingProject = await this.prisma.project.findFirst({
+            where: {
+                title: createProjectDto.title,
+                ownerId: userId,
+            },
+        });
+
+        if (existingProject) {
+            throw new ConflictException(
+                "You already have a project with this title",
+            );
+        }
+
+        const project = await this.prisma.project.create({
+            data: {
+                title: createProjectDto.title,
+                description: createProjectDto.description || null,
+                ownerId: userId,
+            },
+            include: {
+                owner: {
+                    select: { id: true, email: true },
+                },
+                members: {
+                    include: {
+                        user: {
+                            select: { id: true, email: true },
+                        },
+                    },
+                },
+                tasks: true,
+            },
+        });
+
+        return this.mapToDetailResponse(project);
+    }
+
+    /**
+     * Find all projects for a user (owned + member projects)
+     */
+    public async findAll(
+        userId: number,
+        options: { page: number; limit: number; role: string },
+    ): Promise<PaginatedResponse<ProjectResponseDto>> {
+        const skip = (options.page - 1) * options.limit;
+
+        // Define the where conditions
+        const whereConditions: Prisma.ProjectWhereInput =
+            options.role === "owner"
+                ? { ownerId: userId }
+                : options.role === "member"
+                    ? {
+                        members: {
+                            some: { userId },
+                        },
+                    }
+                    : {
+                        OR: [
+                            { ownerId: userId },
+                            { members: { some: { userId } } },
+                        ],
+                    };
+
+        // Create the type based on that include
+        type ProjectWithRelations = Prisma.ProjectGetPayload<{
+            include: typeof projectInclude;
+        }>;
+
+        // Execute the database queries
+        const [projects, total] = await Promise.all([
+            this.prisma.project.findMany({
+                where: whereConditions,
+                include: projectInclude,
+                orderBy: { createdAt: "desc" },
+                take: options.limit,
+                skip,
+            }),
+            this.prisma.project.count({ where: whereConditions }),
+        ]);
+
+        // Map the results to your DTO
+        const data = projects.map((project: ProjectWithRelations): ProjectResponseDto => ({
+            id: project.id,
+            title: project.title,
+            description: project.description ?? '', // Use nullish coalescing for safety
+            ownerId: project.ownerId,
+            memberCount: project.members.length + 1, // +1 for the owner
+            taskCount: project.tasks.length,
+            createdAt: project.createdAt,
+        }));
+
+        return {
+            data,
+            pagination: {
+                page: options.page,
+                limit: options.limit,
+                total,
+                totalPages: Math.ceil(total / options.limit),
+            },
+        };
+    }
+
+    /**
+     * Find a single project by ID
+     * Verifies user has access
+     */
+  public async findOne(
+    projectId: number,
+    userId: number,
+): Promise<ProjectDetailResponseDto | null> {
+
+    const project: ProjectWithDetail | null = await this.prisma.project.findUnique({
+        where: { id: projectId },
+        include: projectDetailInclude,
+    });
+
+    if (!project) return null;
+
+    const isMember = project.members.some((m) => m.userId === userId);
+    const isOwner = project.ownerId === userId;
+
+    if (!isOwner && !isMember) return null;
+
+
+    return this.mapToDetailResponse(project);
+}
+
+    /**
+     * Update a project
+     */
+    public async update(
+        projectId: number,
+        updateProjectDto: UpdateProjectDto,
+    ): Promise<ProjectDetailResponseDto> {
+        const project = await this.prisma.project.update({
+            where: { id: projectId },
+            data: {
+                ...(updateProjectDto.title && {
+                    title: updateProjectDto.title,
+                }),
+                ...(updateProjectDto.description !== undefined && {
+                    description: updateProjectDto.description,
+                }),
+            },
+            include: {
+                owner: {
+                    select: { id: true, email: true },
+                },
+                members: {
+                    include: {
+                        user: {
+                            select: { id: true, email: true },
+                        },
+                    },
+                },
+                tasks: true,
+            },
+        });
+
+        return this.mapToDetailResponse(project);
+    }
+
+    /**
+     * Delete a project and all its associated data
+     */
+    public async remove(projectId: number): Promise<void> {
+        // Cascade delete is handled by Prisma relations
+        await this.prisma.project.delete({
+            where: { id: projectId },
+        });
+    }
+
+    /**
+     * Add a member to a project
+     */
+    public async addMember(projectId: number, userId: number): Promise<AddMemberResponse> {
+        // Verify user exists
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new NotFoundException(`User with ID ${userId} not found`);
+        }
+
+        // Check if user is already a member
+        const existingMembership = await this.prisma.projectMember.findUnique({
+            where: {
+                userId_projectId: {
+                    userId,
+                    projectId,
+                },
+            },
+        });
+
+        if (existingMembership) {
+            throw new ConflictException(
+                "User is already a member of this project",
+            );
+        }
+
+        const membership = await this.prisma.projectMember.create({
+            data: {
+                userId,
+                projectId,
+            },
+            include: {
+                user: {
+                    select: { id: true, email: true },
+                },
+            },
+        });
+
+        return {
+            message: "User added as project member",
+            member: {
+                userId: membership.userId,
+                projectId: membership.projectId,
+                user: membership.user,
+            },
+        };
+    }
+
+    /**
+     * Remove a member from a project
+     */
+    public async removeMember(projectId: number, userId: number): Promise<void> {
+        // Check if member exists
+        const membership = await this.prisma.projectMember.findUnique({
+            where: {
+                userId_projectId: {
+                    userId,
+                    projectId,
+                },
+            },
+        });
+
+        if (!membership) {
+            throw new NotFoundException(
+                `User ${userId} is not a member of this project`,
+            );
+        }
+
+        // Remove the membership
+        await this.prisma.projectMember.delete({
+            where: {
+                userId_projectId: {
+                    userId,
+                    projectId,
+                },
+            },
+        });
+    }
+
+    /**
+     * Get all members of a project (including owner)
+     */
+    public async getMembers(
+    projectId: number,
+    userId: number,
+): Promise<ProjectMemberDto[]> {
+    const project: ProjectWithMembersAndOwner | null = await this.prisma.project.findUnique({
+        where: { id: projectId },
+        include: projectMemberInclude,
+    });
+
+    if (!project) {
+        throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    // 'm' is automatically typed here
+    const isMember = project.members.some((m) => m.userId === userId);
+    const isOwner = project.ownerId === userId;
+
+    if (!isOwner && !isMember) {
+        throw new ForbiddenException("You don't have access to this project");
+    }
+
+    const members: ProjectMemberDto[] = [
+        {
+            id: project.owner.id,
+            email: project.owner.email,
+            isOwner: true,
+        },
+        // FIX: 'm' is automatically typed, so m.user.id and m.user.email are valid
+        ...project.members.map((m) => ({
+            id: m.user.id,
+            email: m.user.email,
+            isOwner: false,
+        })),
+    ];
+
+    return members;
+}
+
+    /**
+     * Check if user is the owner of a project
+     */
+    public async isOwner(projectId: number, userId: number): Promise<boolean> {
+        const project = await this.prisma.project.findUnique({
+            where: { id: projectId },
+            select: { ownerId: true },
+        });
+
+        return project?.ownerId === userId;
+    }
+
+    /**
+     * Helper method to map project to detail response DTO
+     */
+    private mapToDetailResponse(project: ProjectWithDetail): ProjectDetailResponseDto {
+    return {
+        id: project.id,
+        title: project.title,
+        description: project.description ?? '', // Nullish coalescing for safety
+        ownerId: project.ownerId,
+        owner: {
+            id: project.owner.id,
+            email: project.owner.email,
+        },
+        // FIX: 'm' is now automatically typed; no need for (m: any)
+        members: project.members.map((m) => ({
+            id: m.user.id,
+            email: m.user.email,
+        })),
+        taskCount: project.tasks.length,
+        createdAt: project.createdAt,
+    };
+}
+}

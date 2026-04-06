@@ -3,42 +3,70 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql" // Changed from postgresql
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id        Int       @id @default(autoincrement())
-  email     String    @unique
-  password  String
-  projects  Project[]
-  createdAt DateTime  @default(now())
+  id           Int             @id @default(autoincrement())
+  email        String          @unique
+  password     String
+  ownedProjects Project[]      @relation("ProjectOwner") // ADD THIS
+  projects     ProjectMember[] 
+  tasks        Task[]          
+  logs         Changelog[]     
+  createdAt    DateTime        @default(now())
 }
 
 model Project {
-  id          Int      @id @default(autoincrement())
-  name        String
+  id          Int             @id @default(autoincrement())
+  title       String
   description String?
-  userId      Int
-  user        User     @relation(fields: [userId], references: [id])
+  ownerId     Int             
+  owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id]) 
+  members     ProjectMember[]
   tasks       Task[]
-  createdAt   DateTime @default(now())
+  logs        Changelog[]
+  createdAt   DateTime        @default(now())
+}
+
+model ProjectMember {
+  userId    Int
+  projectId Int
+  user      User    @relation(fields: [userId], references: [id])
+  project   Project @relation(fields: [projectId], references: [id])
+
+  @@id([userId, projectId]) // Composite primary key prevents duplicate memberships
 }
 
 model Task {
-  id          Int      @id @default(autoincrement())
+  id          Int         @id @default(autoincrement())
   title       String
-  status      String   @default("Todo") // "Todo", "In Progress", "Done"
+  status      TaskStatus  @default(TODO) // Business standard: TODO, IN_PROGRESS, DONE
   projectId   Int
-  project     Project  @relation(fields: [projectId], references: [id])
-  logs        Log[]
-  updatedAt   DateTime @updatedAt
+  project     Project     @relation(fields: [projectId], references: [id])
+  assigneeId  Int?
+  assignee    User?       @relation(fields: [assigneeId], references: [id])
+  logs        Changelog[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 }
 
-model Log {
+model Changelog {
   id        Int      @id @default(autoincrement())
-  taskId    Int
-  task      Task     @relation(fields: [taskId], references: [id])
-  message   String
+  action    String   // e.g., "STATUS_CHANGE", "MEMBER_ADDED"
+  details   String?
+  taskId    Int?
+  task      Task?    @relation(fields: [taskId], references: [id])
+  projectId Int
+  project   Project  @relation(fields: [projectId], references: [id])
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
 }
