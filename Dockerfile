@@ -35,9 +35,9 @@ FROM node:20.19.0-alpine
 # Install openssl for runtime
 RUN apk add --no-cache openssl curl
 
-WORKDIR /app
+# Use the same path as the builder for absolute consistency
+WORKDIR /usr/src/app
 
-# Copy only production files from builder
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/dist ./dist
 COPY --from=builder /usr/src/app/prisma ./prisma
@@ -50,4 +50,4 @@ ENV NODE_ENV=production
 EXPOSE 3000
 
 # Start the app
-CMD ["node", "dist/main"]
+CMD ["node", "dist/src/main.js"]
