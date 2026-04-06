@@ -19,7 +19,7 @@ export const prisma = new PrismaClient({
 });
 
 // Export cleanDatabase function
-async function cleanDatabase() {
+export async function cleanDatabase() {
     try {
         await prisma.$executeRawUnsafe("SET FOREIGN_KEY_CHECKS = 0");
 
