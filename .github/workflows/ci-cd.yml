@@ -56,6 +56,8 @@ jobs:
           # Add any other required envs from your config provider here
           API_PREFIX: ${{ secrets.API_PREFIX }}
           SWAGGER_ENABLE: ${{ secrets.SWAGGER_ENABLE }}
+          HEALTH_TOKEN: ${{ secrets.HEALTH_TOKEN }}
+          JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
 
   # The "Delivery" (Build & Push Docker)
   build-docker:
