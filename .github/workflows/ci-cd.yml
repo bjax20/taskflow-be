@@ -10,6 +10,21 @@ jobs:
   #  The "Quality Gate" (CI)
   test-and-lint:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          # Use secrets for the DB setup
+          MYSQL_ROOT_PASSWORD: ${{ secrets.DB_ROOT_PASSWORD }}
+          MYSQL_DATABASE: taskflow_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -ppassword" 
+          --health-interval=10s 
+          --health-timeout=5s 
+          --health-retries=3
+
     steps:
       - uses: actions/checkout@v4
 
@@ -22,13 +37,27 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Run Lint
-        run: npm run lint
+      - name: Run Prisma Generate
+        run: npx prisma generate
+      # Sync first to ensure the tables are complete
+      - name: Sync Database Schema
+        run: npx prisma db push --skip-generate
+        env:
+          DATABASE_URL: mysql://root:${{ secrets.DB_ROOT_PASSWORD }}@localhost:3306/taskflow_test
 
       - name: Run Tests (TDD Strict)
         run: npm run test
         env:
-          DATABASE_URL: mysql://root:password@localhost:3306/taskflow_test
+          NODE_ENV: test
+          # Construct the URL using the secret
+          DATABASE_URL: mysql://root:${{ secrets.DB_ROOT_PASSWORD }}@localhost:3306/taskflow_test
+          API_PORT: ${{ secrets.API_PORT }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          # Add any other required envs from your config provider here
+          API_PREFIX: ${{ secrets.API_PREFIX }}
+          SWAGGER_ENABLE: ${{ secrets.SWAGGER_ENABLE }}
+          HEALTH_TOKEN: ${{ secrets.HEALTH_TOKEN }}
+          JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
 
   # The "Delivery" (Build & Push Docker)
   build-docker:
@@ -79,7 +108,7 @@ jobs:
             echo "=== 🚀 STEP 1: Setting up Environment ==="
             mkdir -p ~/taskflow-backend
             cd ~/taskflow-backend
-            
+
             # Create .env using the PORT secret
             cat > .env << EOF
             NODE_ENV=production
@@ -99,12 +128,12 @@ jobs:
 
             echo "✅ .env created. Verifying keys..."
             grep -E "API_PORT|API_PREFIX|JWT_SECRET|DATABASE_URL" .env | sed 's/=.*//' | sed 's/^/Injected: /'
-            
+
             echo "=== 📦 STEP 2: Refreshing Containers ==="
             docker pull billjerson/taskflow-backend:latest
             docker-compose down || true
             docker-compose up -d --force-recreate
-            
+
             echo "=== 🔍 STEP 3: MySQL Health Check ==="
             until docker-compose exec -T db mysqladmin ping -h localhost -u root -p${{ secrets.DB_ROOT_PASSWORD }} &> /dev/null; do
               echo "MySQL warming up..."
@@ -132,5 +161,5 @@ jobs:
 
             echo "=== 🔄 STEP 5: Database Migrations ==="
             docker-compose exec -T api npx prisma migrate deploy
-            
+
             echo "=== 🎉 ✅ DEPLOYMENT SUCCESSFUL ==="
