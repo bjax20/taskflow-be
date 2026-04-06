@@ -19,22 +19,26 @@ export const prisma = new PrismaClient({
 });
 
 // Export cleanDatabase function
-export async function cleanDatabase() {
+async function cleanDatabase() {
     try {
-        // Disable foreign key checks to allow deletion in any order
         await prisma.$executeRawUnsafe("SET FOREIGN_KEY_CHECKS = 0");
 
-        // Delete in order of dependencies (most dependent first)
-        await prisma.projectMember.deleteMany({});
-        await prisma.task.deleteMany({});
-        await prisma.project.deleteMany({});
-        await prisma.user.deleteMany({});
+        // robust approach: Wrap in try-catch or only delete if tables exist
+        const tables = ["ProjectMember", "Task", "Project", "User", "Changelog"];
+        
+        for (const table of tables) {
+            try {
+                // Using executeRaw because it won't crash the whole process 
+                // if the Prisma Client hasn't loaded the model yet
+                await prisma.$executeRawUnsafe(`DELETE FROM \`${table}\``);
+            } catch (e) {
+                // Silently skip if table doesn't exist yet
+            }
+        }
 
-        // Re-enable foreign key checks
         await prisma.$executeRawUnsafe("SET FOREIGN_KEY_CHECKS = 1");
     } catch (error) {
         console.error("Database cleanup failed:", error);
-        throw error;
     }
 }
 

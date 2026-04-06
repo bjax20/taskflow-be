@@ -39,6 +39,11 @@ jobs:
 
       - name: Run Prisma Generate
         run: npx prisma generate
+      # Sync first to ensure the tables are complete
+      - name: Sync Database Schema
+        run: npx prisma db push --skip-generate
+        env:
+          DATABASE_URL: mysql://root:${{ secrets.DB_ROOT_PASSWORD }}@localhost:3306/taskflow_test
 
       - name: Run Tests (TDD Strict)
         run: npm run test
@@ -50,6 +55,7 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           # Add any other required envs from your config provider here
           API_PREFIX: ${{ secrets.API_PREFIX }}
+          SWAGGER_ENABLE: ${{ secrets.SWAGGER_ENABLE }}
 
   # The "Delivery" (Build & Push Docker)
   build-docker:
