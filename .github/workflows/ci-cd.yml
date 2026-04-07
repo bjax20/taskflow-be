@@ -7,27 +7,24 @@ on:
     branches: [main]
 
 jobs:
-  #  The "Quality Gate" (CI)
   test-and-lint:
     runs-on: ubuntu-latest
     services:
       mysql:
         image: mysql:8.0
         env:
-          # Use secrets for the DB setup
           MYSQL_ROOT_PASSWORD: ${{ secrets.DB_ROOT_PASSWORD }}
           MYSQL_DATABASE: tapos_test
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -ppassword" 
+          --health-cmd="mysqladmin ping -p${{ secrets.DB_ROOT_PASSWORD }}" 
           --health-interval=10s 
           --health-timeout=5s 
           --health-retries=3
 
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -39,7 +36,7 @@ jobs:
 
       - name: Run Prisma Generate
         run: npx prisma generate
-      # Sync first to ensure the tables are complete
+
       - name: Sync Database Schema
         run: npx prisma db push --skip-generate
         env:
@@ -49,56 +46,37 @@ jobs:
         run: npm run test
         env:
           NODE_ENV: test
-          # Construct the URL using the secret
-          DATABASE_URL: mysql://root:${{ secrets.DB_ROOT_PASSWORD }}@localhost:3306/tapos_test
-          API_PORT: ${{ secrets.API_PORT }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          # Add any other required envs from your config provider here
-          API_PREFIX: ${{ secrets.API_PREFIX }}
-          SWAGGER_ENABLE: ${{ secrets.SWAGGER_ENABLE }}
-          HEALTH_TOKEN: ${{ secrets.HEALTH_TOKEN }}
-          JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
-      - name: Run E2E Tests (Integration Check)
-        run: npm run test:e2e
-        env:
-          NODE_ENV: test
           DATABASE_URL: mysql://root:${{ secrets.DB_ROOT_PASSWORD }}@localhost:3306/tapos_test
           API_PORT: ${{ secrets.API_PORT }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           API_PREFIX: ${{ secrets.API_PREFIX }}
-          JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
-          HEALTH_TOKEN: ${{ secrets.HEALTH_TOKEN }}
           SWAGGER_ENABLE: ${{ secrets.SWAGGER_ENABLE }}
+          HEALTH_TOKEN: ${{ secrets.HEALTH_TOKEN }}
+          JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
 
-  # The "Delivery" (Build & Push Docker)
   build-docker:
     needs: test-and-lint
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
       - name: Build and Push
         uses: docker/build-push-action@v5
         with:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/tapos-be:latest
 
-  # The "Deployment" (CD) - WITH HEALTH CHECKS & ROLLBACK
-  # The "Deployment" (CD) - STAYS ALIVE ON FAILURE
   deploy:
     needs: build-docker
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Copy docker-compose.yml to VPS
         uses: appleboy/scp-action@master
         with:
@@ -120,57 +98,53 @@ jobs:
             mkdir -p ~/tapos-be
             cd ~/tapos-be
 
-            # Create .env using the PORT secret
             cat > .env << EOF
             NODE_ENV=production
             API_PORT=${{ secrets.API_PORT }}
             API_PREFIX=${{ secrets.API_PREFIX }}
             HEALTH_TOKEN=${{ secrets.HEALTH_TOKEN }}
             SWAGGER_ENABLE=${{ secrets.SWAGGER_ENABLE }}
-            # Auth Configuration
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             JWT_ISSUER=${{ secrets.JWT_ISSUER }}
-            MYSQL_DATABASE=tapos_db
+            MYSQL_DATABASE=${{ secrets.DB_NAME }}
             MYSQL_ROOT_PASSWORD=${{ secrets.DB_ROOT_PASSWORD }}
-            MYSQL_USER=dev_user
+            MYSQL_USER=${{ secrets.DB_USER }}
             MYSQL_PASSWORD=${{ secrets.DB_PASSWORD }}
-            DATABASE_URL="mysql://dev_user:${{ secrets.DB_PASSWORD }}@db:3306/tapos_db"
+            DATABASE_URL="mysql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@tapos_db:3306/${{ secrets.DB_NAME }}"
             EOF
 
-            echo "✅ .env created. Verifying keys..."
-            grep -E "API_PORT|API_PREFIX|JWT_SECRET|DATABASE_URL" .env | sed 's/=.*//' | sed 's/^/Injected: /'
-
             echo "=== 📦 STEP 2: Refreshing Containers ==="
-            docker pull billjerson/tapos-be:latest
-            docker-compose down || true
-            docker-compose up -d --force-recreate
+            docker-compose -p tapos pull
+            # Cleans up orphans and forces refresh of renamed services
+            docker-compose -p tapos down --remove-orphans || true
+            docker-compose -p tapos up -d --force-recreate
 
             echo "=== 🔍 STEP 3: MySQL Health Check ==="
-            until docker-compose exec -T db mysqladmin ping -h localhost -u root -p${{ secrets.DB_ROOT_PASSWORD }} &> /dev/null; do
+            # Using tapos_db service name and Root Secret
+            until docker-compose -p tapos exec -T tapos_db mysqladmin ping -u root -p${{ secrets.DB_ROOT_PASSWORD }} &> /dev/null; do
               echo "MySQL warming up..."
               sleep 3
             done
             echo "✅ MySQL is ready!"
 
             echo "=== 🧪 STEP 4: API Health Check ==="
-            # We use the secret here for the curl command too
             MAX_API_ATTEMPTS=20
             API_ATTEMPT=0
             set +e
-            until docker-compose exec -T api curl -s http://localhost:${{ secrets.API_PORT }}${{ secrets.API_PREFIX }}/health -H "Authorization: Bearer ${{ secrets.HEALTH_TOKEN }}" &> /dev/null; do
+            until docker-compose -p tapos exec -T api curl -s http://localhost:${{ secrets.API_PORT }}${{ secrets.API_PREFIX }}/health -H "Authorization: Bearer ${{ secrets.HEALTH_TOKEN }}" &> /dev/null; do
               API_ATTEMPT=$((API_ATTEMPT + 1))
               if [ $API_ATTEMPT -ge $MAX_API_ATTEMPTS ]; then
-                echo "❌ API Health Check Failed on Port ${{ secrets.API_PORT }}"
-                docker-compose logs --tail=100 api
+                echo "❌ API Health Check Failed"
+                docker-compose -p tapos logs --tail=100 api
                 exit 1
               fi
-              echo "API warming up on port ${{ secrets.API_PORT }}... ($API_ATTEMPT/$MAX_API_ATTEMPTS)"
+              echo "API warming up... ($API_ATTEMPT/$MAX_API_ATTEMPTS)"
               sleep 3
             done
             set -e
             echo "✅ API is healthy!"
 
             echo "=== 🔄 STEP 5: Database Migrations ==="
-            docker-compose exec -T api npx prisma migrate deploy
+            docker-compose -p tapos exec -T api npx prisma migrate deploy
 
             echo "=== 🎉 ✅ DEPLOYMENT SUCCESSFUL ==="

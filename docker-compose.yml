@@ -3,7 +3,7 @@ services:
     image: mysql:8.0
     container_name: tapos_db
     restart: always
-    environment:
+    environment:    
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_USER: ${MYSQL_USER}
@@ -13,7 +13,8 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      # Updated to use the root password for a more reliable ping
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -27,10 +28,11 @@ services:
       - "3000:3000"
     depends_on:
       tapos_db:
-        condition: service_healthy   # ensure db is healthy
+        condition: service_healthy
     env_file:
       - .env
     environment:
+      # Prisma/NestJS will use this to connect
       DATABASE_URL: ${DATABASE_URL}
 
 volumes:
