@@ -25,10 +25,6 @@ describe('AppController (e2e)', () => {
     // 4. Initialize the app
     await app.init();
 
-    console.log('--- REGISTERED ROUTES ---');
-    console.log(app.getHttpAdapter().getInstance().printRoutes());
-    console.log('-------------------------');
-
     // 5. Wait for Fastify to be ready (CRITICAL for Fastify)
     await app.getHttpAdapter().getInstance().ready();
   });
