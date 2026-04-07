@@ -2,7 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { Task } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateTaskDto } from './dto/request/create-task.dto';
-
+import { UpdateTaskStatusDto } from './dto/request/update-task-status.dto';
 
 @Injectable()
 export class TasksService {
@@ -75,6 +75,133 @@ export class TasksService {
       });
 
       return task;
+    });
+  }
+
+  public async updateStatus(
+    projectId: number,
+    taskId: number,
+    userId: number,
+    dto: UpdateTaskStatusDto,
+  ): Promise<Task> {
+    // 1. Verify Project exists
+    const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) throw new NotFoundException('Project not found');
+
+    // 2. Verify User Membership
+    const membership = await this.prisma.projectMember.findFirst({
+      where: { projectId, userId },
+    });
+    if (!membership) throw new ForbiddenException('Not a project member');
+
+    // 3. Find the Task and its current status
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+      include: { assignee: { select: { email: true } } },
+    });
+
+    if (!task || task.projectId !== projectId) {
+      throw new NotFoundException(`Task ${taskId} not found in this project`);
+    }
+
+    const oldStatus = task.status;
+    const newStatus = dto.status;
+
+    // 4. Atomic Update & Log
+    return this.prisma.$transaction(async (tx) => {
+      const updatedTask = await tx.task.update({
+        where: { id: taskId },
+        data: { status: newStatus },
+      });
+
+      const user = await tx.user.findUnique({ where: { id: userId } });
+
+      await tx.changelog.create({
+        data: {
+          action: 'STATUS_UPDATED',
+          details: `${user?.email || 'User'} changed status from ${oldStatus} to ${newStatus} for task "${task.title}".`,
+          projectId,
+          taskId,
+          userId,
+        },
+      });
+
+      return updatedTask;
+    });
+  }
+  public async findAllByProject(projectId: number, userId: number): Promise<Task[]> {
+    // 1. Validate Project Existence
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+    });
+
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    // 2. Validate Membership (Security check)
+    const membership = await this.prisma.projectMember.findFirst({
+      where: { projectId, userId },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException('You do not have access to this project');
+    }
+
+    // 3. Fetch Tasks
+    return this.prisma.task.findMany({
+      where: { projectId },
+      include: {
+        assignee: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc', // Show newest tasks first
+      },
+    });
+  }
+
+  public async delete(projectId: number, taskId: number, userId: number): Promise<void> {
+    // 1. Verify Project Existence
+    const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) throw new NotFoundException('Project not found');
+
+    // 2. Verify User Membership
+    const membership = await this.prisma.projectMember.findFirst({
+      where: { projectId, userId },
+    });
+    if (!membership) throw new ForbiddenException('Not a project member');
+
+    // 3. Find the Task to get its name for the log
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+    });
+
+    if (!task || task.projectId !== projectId) {
+      throw new NotFoundException(`Task ${taskId} not found in this project`);
+    }
+
+    // 4. Atomic Delete & Log
+    return this.prisma.$transaction(async (tx) => {
+      await tx.task.delete({
+        where: { id: taskId },
+      });
+
+      const user = await tx.user.findUnique({ where: { id: userId } });
+
+      await tx.changelog.create({
+        data: {
+          action: 'TASK_DELETED',
+          details: `${user?.email || 'User'} deleted task "${task.title}".`,
+          projectId,
+          taskId,
+          userId,
+        },
+      });
     });
   }
 }
