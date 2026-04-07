@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, UseGuards, Request, ParseIntPipe, Patch, Delete, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, Param, UseGuards, Request, ParseIntPipe, Patch, Delete, HttpCode, HttpStatus, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ProjectAccessGuard } from '../projects/guards/project-access.guard';
@@ -23,6 +23,15 @@ interface AuthenticatedRequest extends Request {
 export class TasksController {
   public constructor(private readonly tasksService: TasksService) {}
 
+  @Get()
+  @ApiOperation({ summary: 'List all tasks for a specific project' })
+  @UseGuards(JwtAuthGuard, ProjectAccessGuard)
+  public async findAll(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.tasksService.findAllByProject(projectId, req.user.userId);
+  }
   @Post()
   @ApiOperation({ summary: 'Create a task and trigger audit log' })
   public async create(
@@ -53,5 +62,24 @@ export class TasksController {
     @Request() req: AuthenticatedRequest,
   ) {
     return this.tasksService.delete(projectId, taskId, req.user.userId);
+  }
+
+  @Get('logs')
+  @ApiOperation({ summary: 'Get activity feed for the project' })
+  public async getLogs(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.tasksService.findProjectLogs(projectId, req.user.userId);
+  }
+
+  @Get(':taskId/logs')
+  @ApiOperation({ summary: 'Get activity feed for a specific task' })
+  public async getTaskLogs(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.tasksService.findTaskLogs(projectId, taskId, req.user.userId);
   }
 }

@@ -204,4 +204,60 @@ export class TasksService {
       });
     });
   }
+
+  public async findProjectLogs(projectId: number, userId: number) {
+  // 1. Authorization (Reuse your existing pattern)
+  const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) throw new NotFoundException('Project not found');
+
+  const membership = await this.prisma.projectMember.findFirst({
+    where: { projectId, userId },
+  });
+  if (!membership) throw new ForbiddenException('Not a member of this project');
+
+  // 2. Fetch the Activity Feed
+  return this.prisma.changelog.findMany({
+    where: { projectId },
+    include: {
+      user: {
+        select: { email: true },
+      },
+      task: {
+        select: { title: true },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+}
+
+public async findTaskLogs(projectId: number, taskId: number, userId: number) {
+  // 1. Standard Auth Checks
+  const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) throw new NotFoundException('Project not found');
+
+  const membership = await this.prisma.projectMember.findFirst({
+    where: { projectId, userId },
+  });
+  if (!membership) throw new ForbiddenException('Access denied');
+
+  // 2. Task-Project Integrity Check
+  const task = await this.prisma.task.findUnique({ where: { id: taskId } });
+  if (!task || task.projectId !== projectId) {
+    throw new NotFoundException('Task not found in this project');
+  }
+
+  // 3. Fetch specific task history
+  return this.prisma.changelog.findMany({
+    where: {
+      taskId,
+      projectId
+    },
+    include: {
+      user: { select: { email: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}
 }

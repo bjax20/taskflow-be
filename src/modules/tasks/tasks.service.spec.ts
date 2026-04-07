@@ -43,6 +43,7 @@ describe('TasksService', () => {
     },
     changelog: {
       create: jest.fn().mockResolvedValue({ id: 1 }),
+      findMany: jest.fn(),
     },
   };
 
@@ -63,6 +64,7 @@ describe('TasksService', () => {
 
             project: mockPrismaClient.project,
             task: mockPrismaClient.task,
+            changelog: mockPrismaClient.changelog,
           },
         },
       ],
@@ -214,6 +216,65 @@ describe('TasksService', () => {
         }),
       })
     );
+  });
+});
+
+describe('findProjectLogs', () => {
+  it('should return all logs for a project, newest first', async () => {
+    const mockLogs = [
+      { id: 1, action: 'TASK_CREATED', details: 'Task A created', createdAt: new Date() },
+      { id: 2, action: 'STATUS_UPDATED', details: 'Task A moved to DONE', createdAt: new Date() },
+    ];
+
+    // 1. Mock Project & Member Checks
+    mockPrismaClient.project.findUnique.mockResolvedValue({ id: 10 });
+    mockPrismaClient.projectMember.findFirst.mockResolvedValue({ userId: 1 });
+
+    // 2. Mock the changelog query
+    mockPrismaClient.changelog.findMany.mockResolvedValue(mockLogs);
+
+    // 3. Execute
+    const result = await service.findProjectLogs(10, 1);
+
+    // 4. Assert
+    expect(result).toHaveLength(2);
+    expect(mockPrismaClient.changelog.findMany).toHaveBeenCalledWith({
+      where: { projectId: 10 },
+      include: {
+        user: { select: { email: true } },
+        task: { select: { title: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  });
+});
+describe('findTaskLogs', () => {
+  it('should return logs specific to a single task', async () => {
+    const mockTaskLogs = [
+      { id: 1, taskId: 101, details: 'Created' },
+      { id: 2, taskId: 101, details: 'Moved to DONE' },
+    ];
+
+    // 1. Mock Project/Member checks
+    mockPrismaClient.project.findUnique.mockResolvedValue({ id: 10 });
+    mockPrismaClient.projectMember.findFirst.mockResolvedValue({ userId: 1 });
+
+    // 2. Mock Task existence (to ensure the task belongs to the project)
+    mockPrismaClient.task.findUnique.mockResolvedValue({ id: 101, projectId: 10 });
+
+    // 3. Mock the changelog query
+    mockPrismaClient.changelog.findMany.mockResolvedValue(mockTaskLogs);
+
+    // 4. Execute
+    const result = await service.findTaskLogs(10, 101, 1);
+
+    // 5. Assert
+    expect(result).toHaveLength(2);
+    expect(mockPrismaClient.changelog.findMany).toHaveBeenCalledWith({
+      where: { taskId: 101, projectId: 10 },
+      include: expect.any(Object),
+      orderBy: { createdAt: 'desc' },
+    });
   });
 });
 });
