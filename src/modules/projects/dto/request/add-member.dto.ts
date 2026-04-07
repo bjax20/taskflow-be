@@ -1,17 +1,16 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsInt, Min } from "class-validator";
+import { IsEmail, IsNotEmpty } from "class-validator";
 
 /**
- * Data Transfer Object for adding a member to a project
+ * Data Transfer Object for adding a member to a project via email
  */
 export class AddMemberDto {
     @ApiProperty({
-        description: "The ID of the user to add as a member",
-        example: 42,
-        type: Number,
-        minimum: 1,
+        description: "The registered email address of the user to add",
+        example: "colleague@company.com",
+        type: String,
     })
-    @IsInt({ message: "userId must be an integer" })
-    @Min(1, { message: "userId must be at least 1" })
-    public userId!: number;
+    @IsEmail({}, { message: "Please provide a valid email address" })
+    @IsNotEmpty({ message: "Email is required" })
+    public email!: string;
 }

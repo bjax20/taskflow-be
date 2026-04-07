@@ -1,7 +1,7 @@
 services:
   db:
     image: mysql:8.0
-    container_name: taskflow_db
+    container_name: tapos_db
     restart: always
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
@@ -20,8 +20,8 @@ services:
       start_period: 10s
 
   api:
-    image: billjerson/taskflow-backend:latest
-    container_name: taskflow_api
+    image: billjerson/tapos-be:latest
+    container_name: tapos_api
     restart: always
     ports:
       - "3000:3000"

@@ -11,8 +11,6 @@ import {
     Query,
     HttpCode,
     HttpStatus,
-    NotFoundException,
-    ForbiddenException,
     ParseIntPipe,
 } from "@nestjs/common";
 import {
@@ -39,8 +37,9 @@ import { UpdateProjectDto } from "./dto/request/update-project.dto";
 import { ProjectDetailResponseDto } from "./dto/response/project-detail/project-detail-response.dto";
 import { ProjectResponseDto } from "./dto/response/project-list/project-response.dto";
 import { ProjectMemberDto } from "./dto/response/project-member.dto";
+import { ProjectAccessGuard } from "./guards/project-access.guard";
+import { ProjectOwnerGuard } from './guards/project-owner.guard';
 import { ProjectsService } from "./projects.service";
-
 /**
  * Projects Management Controller
  *
@@ -244,18 +243,12 @@ export class ProjectsController {
         status: 404,
         description: "Project not found or access denied",
     })
+    @UseGuards(ProjectAccessGuard)
     public async findOne(
-        @Param("id", ParseIntPipe) id: number,
-        @Request() req: RequestWithUser,
+        @Param("id", ParseIntPipe) id: number
     ): Promise<ProjectDetailResponseDto> {
-        const project = await this.projectsService.findOne(
-            id,
-            Number(req.user.userId),
-        );
-        if (!project) {
-            throw new NotFoundException(`Project with ID ${id} not found`);
-        }
-        return project;
+        // We removed req.user.userId because the Service doesn't need to double-check anymore
+        return this.projectsService.findOne(id);
     }
 
     /**
@@ -310,17 +303,11 @@ export class ProjectsController {
         status: 404,
         description: "Project not found",
     })
+    @UseGuards(ProjectOwnerGuard)
     public async update(
         @Param("id", ParseIntPipe) id: number,
-        @Body() updateProjectDto: UpdateProjectDto,
-        @Request() req: RequestWithUser,
+        @Body() updateProjectDto: UpdateProjectDto
     ): Promise<ProjectDetailResponseDto> {
-        const isOwner = await this.projectsService.isOwner(id, Number(req.user.userId));
-        if (!isOwner) {
-            throw new ForbiddenException(
-                "Only the project owner can update this project",
-            );
-        }
         return this.projectsService.update(id, updateProjectDto);
     }
 
@@ -355,20 +342,14 @@ export class ProjectsController {
         status: 404,
         description: "Project not found",
     })
+    @UseGuards(ProjectOwnerGuard)
     public async remove(
-        @Param("id", ParseIntPipe) id: number,
-        @Request() req: RequestWithUser,
+        @Param("id", ParseIntPipe) id: number
     ): Promise<void> {
-        const isOwner = await this.projectsService.isOwner(id, Number(req.user.userId));
-        if (!isOwner) {
-            throw new ForbiddenException(
-                "Only the project owner can delete this project",
-            );
-        }
         await this.projectsService.remove(id);
     }
 
-    /**
+   /**
      * Add a team member to a project
      *
      * Only the project owner can add members.
@@ -384,7 +365,7 @@ export class ProjectsController {
     @ApiOperation({
         summary: "Add team member to project",
         description:
-            "Adds an existing user to a project as a member. " +
+            "Adds an existing user to a project as a member via their email address. " +
             "Only the project owner can add members. " +
             "A user cannot be a member multiple times.",
     })
@@ -392,8 +373,8 @@ export class ProjectsController {
         type: AddMemberDto,
         examples: {
             standard: {
-                summary: "Add a user by ID",
-                value: { userId: 42 },
+                summary: "Add a user by email",
+                value: { email: "colleague@company.com" }, // Updated example
             },
         },
     })
@@ -407,7 +388,7 @@ export class ProjectsController {
                     projectId: 1,
                     user: {
                         id: 42,
-                        email: "alice@company.com",
+                        email: "colleague@company.com", // Updated example
                     },
                 },
             },
@@ -422,20 +403,15 @@ export class ProjectsController {
     })
     @ApiResponse({
         status: 404,
-        description: "Project or user not found",
+        description: "Project or user email not found", // Updated description
     })
+    @UseGuards(ProjectOwnerGuard)
     public async addMember(
         @Param("id", ParseIntPipe) id: number,
-        @Body() addMemberDto: AddMemberDto,
-        @Request() req: RequestWithUser,
+        @Body() addMemberDto: AddMemberDto
     ): Promise<AddMemberResponse> {
-        const isOwner = await this.projectsService.isOwner(id, Number(req.user.userId));
-        if (!isOwner) {
-            throw new ForbiddenException(
-                "Only the project owner can add members",
-            );
-        }
-        return this.projectsService.addMember(id, addMemberDto.userId);
+        // We pass email instead of userId now
+        return this.projectsService.addMember(id, addMemberDto.email);
     }
 
     /**
@@ -476,17 +452,11 @@ export class ProjectsController {
         status: 404,
         description: "Project or member not found",
     })
+    @UseGuards(ProjectOwnerGuard)
     public async removeMember(
         @Param("id", ParseIntPipe) id: number,
-        @Param("userId", ParseIntPipe) userId: number,
-        @Request() req: RequestWithUser,
+        @Param("userId", ParseIntPipe) userId: number
     ): Promise<void> {
-        const isOwner = await this.projectsService.isOwner(id, Number(req.user.userId));
-        if (!isOwner) {
-            throw new ForbiddenException(
-                "Only the project owner can remove members",
-            );
-        }
         await this.projectsService.removeMember(id, userId);
     }
 
@@ -532,10 +502,10 @@ export class ProjectsController {
         status: 404,
         description: "Project not found or access denied",
     })
+    @UseGuards(ProjectAccessGuard)
     public async getMembers(
-        @Param("id", ParseIntPipe) id: number,
-        @Request() req: RequestWithUser,
+        @Param("id", ParseIntPipe) id: number
     ): Promise<ProjectMemberDto[]> {
-        return this.projectsService.getMembers(id, Number(req.user.userId));
+        return this.projectsService.getMembers(id);
     }
 }

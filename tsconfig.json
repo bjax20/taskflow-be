@@ -13,6 +13,7 @@
     "allowJs": true,
     "outDir": "./dist",
     "strictNullChecks": true,
+    "strict": true,
     "noUnusedLocals": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

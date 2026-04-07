@@ -19,7 +19,7 @@ Ensure you have the following installed:
    cp .env.example .env
    ```
 3. Open `.env` and verify the `DATABASE_URL` matches your local Docker settings:
-   `DATABASE_URL="mysql://dev_user:dev_password@localhost:3306/taskflow_db"`
+   `DATABASE_URL="mysql://dev_user:dev_password@localhost:3306/tapos_db"`
 
 ---
 
@@ -30,7 +30,7 @@ docker-compose up -d db
 ```
 
 > **Note for First-Time Setup:** If you encounter a `P3014` error regarding permissions, run the following to grant the dev user "Architect" privileges:
-> `docker exec -it taskflow_db mysql -u root -prootpassword -e "GRANT ALL PRIVILEGES ON *.* TO 'dev_user'@'%'; FLUSH PRIVILEGES;"`
+> `docker exec -it tapos_db mysql -u root -prootpassword -e "GRANT ALL PRIVILEGES ON *.* TO 'dev_user'@'%'; FLUSH PRIVILEGES;"`
 
 ---
 
@@ -72,4 +72,4 @@ If you need to modify the database structure (e.g., adding a new column):
 | `npx prisma studio` | Opens a browser-based UI to view/edit your database data. |
 | `npm run lint` | Runs ESLint to keep code style consistent. |
 
-**Is there any specific part of your `taskflow` logic (like a specific service or guard) that needs special instructions in this file?**
+**Is there any specific part of your `tapos` logic (like a specific service or guard) that needs special instructions in this file?**

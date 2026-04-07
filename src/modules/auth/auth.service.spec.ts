@@ -1,15 +1,15 @@
 import { UnauthorizedException } from "@nestjs/common/exceptions";
 import { JwtModule } from "@nestjs/jwt";
 import { Test, TestingModule } from "@nestjs/testing";
+import * as bcrypt from "bcrypt";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { cleanDatabase } from "../../tests/setup";
-
 import { AuthService } from "./auth.service";
 import { RegisterDto } from "./dto/register.dto";
 
 describe("AuthService", () => {
     let service: AuthService;
-
+    let prisma: PrismaService;
     beforeEach(async () => {
         // Clear the database before each test to ensure isolation
         await cleanDatabase();
@@ -23,26 +23,38 @@ describe("AuthService", () => {
             ],
             providers: [
                 AuthService,
-                PrismaService, // 2. Add this here to fix the "Nest can't resolve dependencies" error
+                PrismaService,
             ],
         }).compile();
 
         service = module.get<AuthService>(AuthService);
+        prisma = module.get<PrismaService>(PrismaService);
     });
 
     it("should hash the password before saving a user", async () => {
-        const registerDto: RegisterDto = {
-            email: "tdd@test.com",
-            password: "Password123!",
-        };
+    const registerDto: RegisterDto = {
+        email: "tdd@test.com",
+        password: "Password123!",
+    };
 
-        const user = await service.register(registerDto);
+    // 1. Run the service (which returns the user WITHOUT password)
+    const result = await service.register(registerDto);
 
-        expect(user).toBeDefined();
-        if (user) {
-            expect(user.password).not.toBe(registerDto.password);
-            expect(user.password.length).toBeGreaterThan(20);
-        }
+    // 2. Fetch the user directly from the DB to check the password field
+    const userInDb = await prisma.user.findUnique({
+        where: { id: result.id },
+    });
+
+    expect(result).toBeDefined();
+    expect(userInDb).toBeDefined();
+
+    // 3. Verify the hash
+    if (userInDb) {
+        expect(userInDb.password).not.toBe(registerDto.password);
+
+        const isMatch = await bcrypt.compare(registerDto.password, userInDb.password);
+        expect(isMatch).toBe(true);
+    }
     });
 
     it("should return an access_token on valid credentials", async () => {

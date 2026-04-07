@@ -1,4 +1,4 @@
-name: Taskflow CI/CD
+name: tapos-be CI/CD
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
         env:
           # Use secrets for the DB setup
           MYSQL_ROOT_PASSWORD: ${{ secrets.DB_ROOT_PASSWORD }}
-          MYSQL_DATABASE: taskflow_test
+          MYSQL_DATABASE: tapos_test
         ports:
           - 3306:3306
         options: >-
@@ -43,14 +43,14 @@ jobs:
       - name: Sync Database Schema
         run: npx prisma db push --skip-generate
         env:
-          DATABASE_URL: mysql://root:${{ secrets.DB_ROOT_PASSWORD }}@localhost:3306/taskflow_test
+          DATABASE_URL: mysql://root:${{ secrets.DB_ROOT_PASSWORD }}@localhost:3306/tapos_test
 
       - name: Run Tests (TDD Strict)
         run: npm run test
         env:
           NODE_ENV: test
           # Construct the URL using the secret
-          DATABASE_URL: mysql://root:${{ secrets.DB_ROOT_PASSWORD }}@localhost:3306/taskflow_test
+          DATABASE_URL: mysql://root:${{ secrets.DB_ROOT_PASSWORD }}@localhost:3306/tapos_test
           API_PORT: ${{ secrets.API_PORT }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           # Add any other required envs from your config provider here
@@ -58,6 +58,17 @@ jobs:
           SWAGGER_ENABLE: ${{ secrets.SWAGGER_ENABLE }}
           HEALTH_TOKEN: ${{ secrets.HEALTH_TOKEN }}
           JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
+      - name: Run E2E Tests (Integration Check)
+        run: npm run test:e2e
+        env:
+          NODE_ENV: test
+          DATABASE_URL: mysql://root:${{ secrets.DB_ROOT_PASSWORD }}@localhost:3306/tapos_test
+          API_PORT: ${{ secrets.API_PORT }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          API_PREFIX: ${{ secrets.API_PREFIX }}
+          JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
+          HEALTH_TOKEN: ${{ secrets.HEALTH_TOKEN }}
+          SWAGGER_ENABLE: ${{ secrets.SWAGGER_ENABLE }}
 
   # The "Delivery" (Build & Push Docker)
   build-docker:
@@ -77,7 +88,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/taskflow-backend:latest
+          tags: ${{ secrets.DOCKER_USERNAME }}/tapos-be:latest
 
   # The "Deployment" (CD) - WITH HEALTH CHECKS & ROLLBACK
   # The "Deployment" (CD) - STAYS ALIVE ON FAILURE
@@ -95,7 +106,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           source: "docker-compose.yml"
-          target: "~/taskflow-backend/"
+          target: "~/tapos-be/"
 
       - name: Deploy to Singapore VPS via SSH
         uses: appleboy/ssh-action@master
@@ -106,8 +117,8 @@ jobs:
           script: |
             set -e 
             echo "=== 🚀 STEP 1: Setting up Environment ==="
-            mkdir -p ~/taskflow-backend
-            cd ~/taskflow-backend
+            mkdir -p ~/tapos-be
+            cd ~/tapos-be
 
             # Create .env using the PORT secret
             cat > .env << EOF
@@ -119,18 +130,18 @@ jobs:
             # Auth Configuration
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             JWT_ISSUER=${{ secrets.JWT_ISSUER }}
-            MYSQL_DATABASE=taskflow_db
+            MYSQL_DATABASE=tapos_db
             MYSQL_ROOT_PASSWORD=${{ secrets.DB_ROOT_PASSWORD }}
             MYSQL_USER=dev_user
             MYSQL_PASSWORD=${{ secrets.DB_PASSWORD }}
-            DATABASE_URL="mysql://dev_user:${{ secrets.DB_PASSWORD }}@db:3306/taskflow_db"
+            DATABASE_URL="mysql://dev_user:${{ secrets.DB_PASSWORD }}@db:3306/tapos_db"
             EOF
 
             echo "✅ .env created. Verifying keys..."
             grep -E "API_PORT|API_PREFIX|JWT_SECRET|DATABASE_URL" .env | sed 's/=.*//' | sed 's/^/Injected: /'
 
             echo "=== 📦 STEP 2: Refreshing Containers ==="
-            docker pull billjerson/taskflow-backend:latest
+            docker pull billjerson/tapos-be:latest
             docker-compose down || true
             docker-compose up -d --force-recreate
 
