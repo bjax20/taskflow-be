@@ -1,5 +1,5 @@
 services:
-  db:
+  tapos_db:
     image: mysql:8.0
     container_name: tapos_db
     restart: always
