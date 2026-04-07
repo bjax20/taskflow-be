@@ -134,7 +134,7 @@ jobs:
             MYSQL_ROOT_PASSWORD=${{ secrets.DB_ROOT_PASSWORD }}
             MYSQL_USER=dev_user
             MYSQL_PASSWORD=${{ secrets.DB_PASSWORD }}
-            DATABASE_URL="mysql://dev_user:${{ secrets.DB_PASSWORD }}@db:3306/tapos_db"
+            DATABASE_URL="mysql://dev_user:${{ secrets.DB_PASSWORD }}@tapos_db:3306/tapos_db"
             EOF
 
             echo "✅ .env created. Verifying keys..."
@@ -146,7 +146,7 @@ jobs:
             docker-compose up -d --force-recreate
 
             echo "=== 🔍 STEP 3: MySQL Health Check ==="
-            until docker-compose exec -T db mysqladmin ping -h localhost -u root -p${{ secrets.DB_ROOT_PASSWORD }} &> /dev/null; do
+            until docker-compose -p tapos exec -T tapos_db mysqladmin ping -u root -p${{ secrets.DB_ROOT_PASSWORD }} &> /dev/null; do
               echo "MySQL warming up..."
               sleep 3
             done
@@ -161,7 +161,7 @@ jobs:
               API_ATTEMPT=$((API_ATTEMPT + 1))
               if [ $API_ATTEMPT -ge $MAX_API_ATTEMPTS ]; then
                 echo "❌ API Health Check Failed on Port ${{ secrets.API_PORT }}"
-                docker-compose logs --tail=100 api
+                docker-compose -p tapos logs --tail=100 api
                 exit 1
               fi
               echo "API warming up on port ${{ secrets.API_PORT }}... ($API_ATTEMPT/$MAX_API_ATTEMPTS)"
@@ -171,6 +171,6 @@ jobs:
             echo "✅ API is healthy!"
 
             echo "=== 🔄 STEP 5: Database Migrations ==="
-            docker-compose exec -T api npx prisma migrate deploy
+            docker-compose -p tapos exec -T api npx prisma migrate deploy
 
             echo "=== 🎉 ✅ DEPLOYMENT SUCCESSFUL ==="
