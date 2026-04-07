@@ -25,10 +25,10 @@ export async function cleanDatabase() {
 
         // robust approach: Wrap in try-catch or only delete if tables exist
         const tables = ["ProjectMember", "Task", "Project", "User", "Changelog"];
-        
+
         for (const table of tables) {
             try {
-                // Using executeRaw because it won't crash the whole process 
+                // Using executeRaw because it won't crash the whole process
                 // if the Prisma Client hasn't loaded the model yet
                 await prisma.$executeRawUnsafe(`DELETE FROM \`${table}\``);
             } catch (e) {

@@ -1,7 +1,6 @@
 import {
     Injectable,
     NotFoundException,
-    ForbiddenException,
     ConflictException,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
@@ -173,23 +172,17 @@ export class ProjectsService {
      * Find a single project by ID
      * Verifies user has access
      */
-  public async findOne(
+ public async findOne(
     projectId: number,
-    userId: number,
-): Promise<ProjectDetailResponseDto | null> {
-
-    const project: ProjectWithDetail | null = await this.prisma.project.findUnique({
+): Promise<ProjectDetailResponseDto> {
+    const project = await this.prisma.project.findUnique({
         where: { id: projectId },
         include: projectDetailInclude,
     });
 
-    if (!project) return null;
-
-    const isMember = project.members.some((m) => m.userId === userId);
-    const isOwner = project.ownerId === userId;
-
-    if (!isOwner && !isMember) return null;
-
+    if (!project) {
+        throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
 
     return this.mapToDetailResponse(project);
 }
@@ -242,52 +235,52 @@ export class ProjectsService {
     /**
      * Add a member to a project
      */
-    public async addMember(projectId: number, userId: number): Promise<AddMemberResponse> {
-        // Verify user exists
-        const user = await this.prisma.user.findUnique({
-            where: { id: userId },
-        });
+    public async addMember(projectId: number, email: string): Promise<AddMemberResponse> {
+       //  Look up the user by email instead of ID
+    const user = await this.prisma.user.findUnique({
+        where: { email },
+    });
 
-        if (!user) {
-            throw new NotFoundException(`User with ID ${userId} not found`);
-        }
+    //  If user doesn't exist, throw 404
+    if (!user) {
+        throw new NotFoundException(`User with email ${email} not found`);
+    }
 
-        // Check if user is already a member
-        const existingMembership = await this.prisma.projectMember.findUnique({
-            where: {
-                userId_projectId: {
-                    userId,
-                    projectId,
-                },
-            },
-        });
-
-        if (existingMembership) {
-            throw new ConflictException(
-                "User is already a member of this project",
-            );
-        }
-
-        const membership = await this.prisma.projectMember.create({
-            data: {
-                userId,
+    // Check if user is already a member using the ID we just found
+    const existingMembership = await this.prisma.projectMember.findUnique({
+        where: {
+            userId_projectId: {
+                userId: user.id,
                 projectId,
             },
-            include: {
-                user: {
-                    select: { id: true, email: true },
-                },
-            },
-        });
+        },
+    });
 
-        return {
-            message: "User added as project member",
-            member: {
-                userId: membership.userId,
-                projectId: membership.projectId,
-                user: membership.user,
+    if (existingMembership) {
+        throw new ConflictException("User is already a member of this project");
+    }
+
+    //  Create the membership
+    const membership = await this.prisma.projectMember.create({
+        data: {
+            userId: user.id,
+            projectId,
+        },
+        include: {
+            user: {
+                select: { id: true, email: true },
             },
-        };
+        },
+    });
+
+    return {
+        message: "User added as project member",
+        member: {
+            userId: membership.userId,
+            projectId: membership.projectId,
+            user: membership.user,
+        },
+    };
     }
 
     /**
@@ -325,8 +318,7 @@ export class ProjectsService {
      * Get all members of a project (including owner)
      */
     public async getMembers(
-    projectId: number,
-    userId: number,
+    projectId: number
 ): Promise<ProjectMemberDto[]> {
     const project: ProjectWithMembersAndOwner | null = await this.prisma.project.findUnique({
         where: { id: projectId },
@@ -335,14 +327,6 @@ export class ProjectsService {
 
     if (!project) {
         throw new NotFoundException(`Project with ID ${projectId} not found`);
-    }
-
-    // 'm' is automatically typed here
-    const isMember = project.members.some((m) => m.userId === userId);
-    const isOwner = project.ownerId === userId;
-
-    if (!isOwner && !isMember) {
-        throw new ForbiddenException("You don't have access to this project");
     }
 
     const members: ProjectMemberDto[] = [
@@ -372,6 +356,29 @@ export class ProjectsService {
         });
 
         return project?.ownerId === userId;
+    }
+
+    /**
+     * Check if user is either the owner OR a member of the project
+     */
+    public async isMemberOrOwner(projectId: number, userId: number): Promise<boolean> {
+    const project = await this.prisma.project.findUnique({
+        where: { id: projectId },
+        select: {
+            ownerId: true,
+            members: {
+                where: { userId },
+                select: { userId: true },
+            },
+        },
+    });
+
+    if (!project) return false;
+
+    const isOwner = project.ownerId === userId;
+    const isMember = project.members.length > 0;
+
+    return isOwner || isMember;
     }
 
     /**

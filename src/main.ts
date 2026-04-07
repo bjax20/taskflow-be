@@ -10,7 +10,7 @@ import { CommonModule, LogInterceptor } from './modules/common';
  * it is not required to change them (see the `.env.example` file)
  */
 const API_DEFAULT_PORT = 3000;
-const API_DEFAULT_PREFIX = '/api/v1/';
+const API_DEFAULT_PREFIX = '/api/v1';
 
 /**
  * The defaults below are dedicated to Swagger configuration, change them
@@ -18,8 +18,8 @@ const API_DEFAULT_PREFIX = '/api/v1/';
  *
  * @todo Change the constants below following your API requirements
  */
-const SWAGGER_TITLE = 'Passenger API';
-const SWAGGER_DESCRIPTION = 'API used for passenger management';
+const SWAGGER_TITLE = 'Tapos API';
+const SWAGGER_DESCRIPTION = 'API used for tapos';
 const SWAGGER_PREFIX = '/docs';
 
 /**
@@ -32,11 +32,21 @@ const SWAGGER_PREFIX = '/docs';
  *       code below with API keys, security requirements, tags and more.
  */
 function createSwagger(app: INestApplication) {
-
     const options = new DocumentBuilder()
         .setTitle(SWAGGER_TITLE)
         .setDescription(SWAGGER_DESCRIPTION)
-        .addBearerAuth()
+        // Explicitly name it "access-token" to match Controller
+        .addBearerAuth(
+            {
+                type: 'http',
+                scheme: 'bearer',
+                bearerFormat: 'JWT',
+                name: 'JWT',
+                description: 'Enter JWT token',
+                in: 'header',
+            },
+            'access-token',
+        )
         .build();
 
     const document = SwaggerModule.createDocument(app, options);

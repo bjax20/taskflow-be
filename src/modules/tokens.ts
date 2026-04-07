@@ -5,7 +5,7 @@
 export enum Service {
     CONFIG = 'config.service',
     STORAGE = 'storage.service',
-    // Add others as you build your Taskflow features
+    // Add others as you build your tapos features
 }
 
 export enum Role {
