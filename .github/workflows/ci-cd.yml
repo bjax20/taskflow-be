@@ -10,7 +10,7 @@ jobs:
   test-and-lint:
     runs-on: ubuntu-latest
     services:
-      mysql:
+      tapos_db:
         image: mysql:8.0
         env:
           # Use a hardcoded string here. Secrets aren't allowed in services.
