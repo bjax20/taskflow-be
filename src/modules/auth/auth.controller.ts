@@ -39,7 +39,7 @@ export class AuthController {
 
     @Get("me")
     @UseGuards(JwtAuthGuard)
-    @ApiBearerAuth() // Adds the "Authorize" button requirement in Swagger
+    @ApiBearerAuth('access-token')
     @ApiOperation({ summary: "Fetch current logged-in user profile" })
     public getProfile(@Request() req: RequestWithUser) {
         // req.user is populated by the JwtStrategy
