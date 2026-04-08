@@ -10,7 +10,7 @@ jobs:
   test-and-lint:
     runs-on: ubuntu-latest
     services:
-      mysql:
+      tapos_db:
         image: mysql:8.0
         env:
           # Use a hardcoded string here. Secrets aren't allowed in services.
@@ -45,7 +45,7 @@ jobs:
           DATABASE_URL: mysql://root:test_root_password@localhost:3306/tapos_test
 
       - name: Run Tests (TDD Strict)
-        run: npm run test
+        run: npx jest --config jest.config.js
         env:
           NODE_ENV: test
           DATABASE_URL: mysql://root:test_root_password@localhost:3306/tapos_test
@@ -57,7 +57,7 @@ jobs:
           JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
 
       - name: Run E2E Tests
-        run: npm run test:e2e
+        run: npx jest --config src/tests/jest-e2e.json --rootDir .
         env:
           NODE_ENV: test
           DATABASE_URL: mysql://root:test_root_password@localhost:3306/tapos_test
@@ -137,6 +137,8 @@ jobs:
               echo "MySQL warming up..."
               sleep 3
             done
+            echo "🛠️ Configuring User Permissions..."
+            docker-compose -p tapos exec -T tapos_db mysql -u root -p${{ secrets.DB_ROOT_PASSWORD }} -e "GRANT ALL PRIVILEGES ON *.* TO '${{ secrets.DB_USER }}'@'%'; FLUSH PRIVILEGES;"
             echo "✅ MySQL is ready!"
 
             echo "=== 🧪 STEP 4: API Health Check ==="

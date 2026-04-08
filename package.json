@@ -16,20 +16,23 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "dotenv -e .env.test -- jest",
+    "db:test:create": "docker exec tapos_db mysql -u root -proot -e \"CREATE DATABASE IF NOT EXISTS tapos_test;\"",
+    "test:setup": "npm run db:test:create && npm run test:migrate",
+    "test": "npm run db:test:create && npm run test:migrate && dotenv -e .env.test -- jest",
     "test:migrate": "dotenv -e .env.test -- npx prisma migrate deploy",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:all": "npm run lint && npm run test && npm run build",
     "test:int": "jest --config src/tests/jest-int.json --rootDir .",
-    "test:e2e": "dotenv -e .env.test -- jest --config src/tests/jest-e2e.json --rootDir .",
+    "test:e2e": "npm run db:test:create && npm run test:migrate && dotenv -e .env.test -- jest --config src/tests/jest-e2e.json --rootDir .",
     "test:e2e:watch": "dotenv -e .env.test -- jest --config src/tests/jest-e2e.json --rootDir . --watch",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "migrate:dev": "npx prisma migrate dev",
     "migrate:prod": "npx prisma migrate deploy",
     "prisma:generate": "npx prisma generate",
     "seed": "ts-node prisma/seed.ts",
-    "db:setup": "npm run prisma:generate && npm run migrate:dev && npm run seed"
+    "db:grant": "docker exec tapos_db mysql -u root -proot -e \"GRANT ALL PRIVILEGES ON *.* TO 'dev_user'@'%'; FLUSH PRIVILEGES;\"",
+    "db:setup": "npm run db:grant && npm run prisma:generate && npm run migrate:dev && npm run seed"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

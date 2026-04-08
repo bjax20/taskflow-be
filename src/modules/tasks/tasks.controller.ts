@@ -19,7 +19,7 @@ interface AuthenticatedRequest extends Request {
 @ApiTags('Tasks')
 @ApiBearerAuth('access-token')
 @Controller('projects/:projectId/tasks')
-@UseGuards(JwtAuthGuard, ProjectAccessGuard, AssigneeMembershipGuard)
+@UseGuards(JwtAuthGuard, ProjectAccessGuard)
 export class TasksController {
   public constructor(private readonly tasksService: TasksService) {}
 
@@ -33,6 +33,7 @@ export class TasksController {
     return this.tasksService.findAllByProject(projectId, req.user.userId);
   }
   @Post()
+  @UseGuards(JwtAuthGuard, ProjectAccessGuard, AssigneeMembershipGuard)
   @ApiOperation({ summary: 'Create a task and trigger audit log' })
   public async create(
     @Param('projectId', ParseIntPipe) projectId: number,
