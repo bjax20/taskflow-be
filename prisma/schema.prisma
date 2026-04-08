@@ -8,22 +8,22 @@ datasource db {
 }
 
 model User {
-  id           Int             @id @default(autoincrement())
-  email        String          @unique
-  password     String
-  ownedProjects Project[]      @relation("ProjectOwner")
-  projects     ProjectMember[] 
-  tasks        Task[]          
-  logs         Changelog[]     
-  createdAt    DateTime        @default(now())
+  id            Int             @id @default(autoincrement())
+  email         String          @unique
+  password      String
+  ownedProjects Project[]       @relation("ProjectOwner")
+  projects      ProjectMember[]
+  tasks         Task[]
+  logs          Changelog[]
+  createdAt     DateTime        @default(now())
 }
 
 model Project {
   id          Int             @id @default(autoincrement())
   title       String
   description String?
-  ownerId     Int             
-  owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id]) 
+  ownerId     Int
+  owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id])
   members     ProjectMember[]
   tasks       Task[]
   logs        Changelog[]
@@ -34,18 +34,20 @@ model ProjectMember {
   userId    Int
   projectId Int
   user      User    @relation(fields: [userId], references: [id])
-  project   Project @relation(fields: [projectId], references: [id])
+  // Added onDelete: Cascade - Removes membership when project is deleted
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  @@id([userId, projectId]) // Composite primary key prevents duplicate memberships
+  @@id([userId, projectId])
 }
 
 model Task {
   id          Int         @id @default(autoincrement())
   title       String
   description String?
-  status      TaskStatus  @default(TODO) // Business standard: TODO, IN_PROGRESS, DONE
+  status      TaskStatus  @default(TODO)
   projectId   Int
-  project     Project     @relation(fields: [projectId], references: [id])
+  // Added onDelete: Cascade - Deletes all tasks when the project is deleted
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   assigneeId  Int?
   assignee    User?       @relation(fields: [assigneeId], references: [id])
   logs        Changelog[]
@@ -55,12 +57,14 @@ model Task {
 
 model Changelog {
   id        Int      @id @default(autoincrement())
-  action    String   // e.g., "STATUS_CHANGE", "MEMBER_ADDED"
+  action    String
   details   String?
   taskId    Int?
-  task      Task?    @relation(fields: [taskId], references: [id])
+  // Added onDelete: Cascade - Deletes logs linked to a task if the task is deleted
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
   projectId Int
-  project   Project  @relation(fields: [projectId], references: [id])
+  // Added onDelete: Cascade - Deletes logs linked to a project if the project is deleted
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   userId    Int
   user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
