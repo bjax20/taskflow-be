@@ -3,8 +3,9 @@ import { ConfigModule } from "@nestjs/config";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { AuthModule } from "./auth/auth.module";
 import { CommonModule } from "./common/common.module";
-import { ProjectsController } from "./projects/projects.controller";
-import { ProjectsService } from "./projects/projects.service";
+import { ProjectsModule } from "./projects/projects.module";
+import { TasksModule } from "./tasks/tasks.module";
+
 
 @Module({
     imports: [
@@ -14,10 +15,11 @@ import { ProjectsService } from "./projects/projects.service";
         }),
         CommonModule,
         PrismaModule,
-
         AuthModule,
+        ProjectsModule,
+        TasksModule,
     ],
-    controllers: [ProjectsController],
-    providers: [ProjectsService],
+    controllers: [],
+    providers: [],
 })
 export class AppModule {}
