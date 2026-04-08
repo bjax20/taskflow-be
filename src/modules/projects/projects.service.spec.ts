@@ -133,23 +133,44 @@ describe('ProjectsService', () => {
       await expect(service.create(dto, 1)).rejects.toThrow(ConflictException);
     });
 
-    it('should create a new project if title is unique', async () => {
-      const createMock = mockPrisma.project.create;
-      mockPrisma.project.findFirst.mockResolvedValue(null);
-      createMock.mockResolvedValue({
+   it('should create a new project and link the owner as the first member', async () => {
+    const createMock = mockPrisma.project.create;
+    mockPrisma.project.findFirst.mockResolvedValue(null);
+
+    // 1. We mock what the DB SHOULD return after a successful nested create
+    createMock.mockResolvedValue({
         id: 1,
-        title: 'New',
+        title: 'New Project',
+        description: 'Desc',
         ownerId: 1,
         owner: { id: 1, email: 'a@a.com' },
-        members: [],
+        members: [
+        {
+            user: { id: 1, email: 'a@a.com' } // The owner is now in the members array
+        }
+        ],
         tasks: [],
-      });
-
-      const result = await service.create({ title: 'New' }, 1);
-      expect(result.title).toBe('New');
-      // Assert against the reference variable
-      expect(createMock).toHaveBeenCalled();
+        createdAt: new Date(),
     });
+
+  const result = await service.create({ title: 'New Project', description: 'Desc' }, 1);
+
+  // 2. THE STRIKE ZONE: This fails if you forget 'members: { create: ... }' in the Service
+  expect(createMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      data: expect.objectContaining({
+        ownerId: 1,
+        members: {
+          create: { userId: 1 }
+        }
+      })
+    })
+  );
+
+  // 3. Verify the returned DTO reflects the membership
+  expect(result.members).toHaveLength(1);
+  expect(result.members[0].id).toBe(1);
+});
   });
 
   describe('remove', () => {

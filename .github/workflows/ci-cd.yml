@@ -137,6 +137,8 @@ jobs:
               echo "MySQL warming up..."
               sleep 3
             done
+            echo "🛠️ Configuring User Permissions..."
+            docker-compose -p tapos exec -T tapos_db mysql -u root -p${{ secrets.DB_ROOT_PASSWORD }} -e "GRANT ALL PRIVILEGES ON *.* TO '${{ secrets.DB_USER }}'@'%'; FLUSH PRIVILEGES;"
             echo "✅ MySQL is ready!"
 
             echo "=== 🧪 STEP 4: API Health Check ==="

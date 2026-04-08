@@ -33,9 +33,9 @@ const projectMemberInclude = {
     },
 } satisfies Prisma.ProjectInclude;
 
-type ProjectWithMembersAndOwner = Prisma.ProjectGetPayload<{
-    include: typeof projectMemberInclude;
-}>;
+// type ProjectWithMembersAndOwner = Prisma.ProjectGetPayload<{
+//     include: typeof projectMemberInclude;
+// }>;
 
 // Define the inclusion once
 const projectDetailInclude = {
@@ -62,46 +62,39 @@ export class ProjectsService {
      * Create a new project
      */
     public async create(
-        createProjectDto: CreateProjectDto,
-        userId: number,
-    ): Promise<ProjectDetailResponseDto> {
-        // Check if project with same title already exists for this user
-        const existingProject = await this.prisma.project.findFirst({
-            where: {
-                title: createProjectDto.title,
-                ownerId: userId,
-            },
-        });
+    createProjectDto: CreateProjectDto,
+    userId: number,
+): Promise<ProjectDetailResponseDto> {
+    // 1. Check if project with same title already exists for this user
+    const existingProject = await this.prisma.project.findFirst({
+        where: {
+            title: createProjectDto.title,
+            ownerId: userId,
+        },
+    });
 
-        if (existingProject) {
-            throw new ConflictException(
-                "You already have a project with this title",
-            );
-        }
-
-        const project = await this.prisma.project.create({
-            data: {
-                title: createProjectDto.title,
-                description: createProjectDto.description || null,
-                ownerId: userId,
-            },
-            include: {
-                owner: {
-                    select: { id: true, email: true },
-                },
-                members: {
-                    include: {
-                        user: {
-                            select: { id: true, email: true },
-                        },
-                    },
-                },
-                tasks: true,
-            },
-        });
-
-        return this.mapToDetailResponse(project);
+    if (existingProject) {
+        throw new ConflictException("You already have a project with this title");
     }
+
+    // 2. The Fix: Add the 'members' nested create
+    const project = await this.prisma.project.create({
+        data: {
+            title: createProjectDto.title,
+            description: createProjectDto.description || null,
+            ownerId: userId,
+            // THIS IS THE MISSING PIECE:
+            members: {
+                create: {
+                    userId: userId,
+                },
+            },
+        },
+        include: projectDetailInclude, // Ensures we return the member we just created
+    });
+
+    return this.mapToDetailResponse(project);
+}
 
     /**
      * Find all projects for a user (owned + member projects)
@@ -152,7 +145,7 @@ export class ProjectsService {
             title: project.title,
             description: project.description ?? '', // Use nullish coalescing for safety
             ownerId: project.ownerId,
-            memberCount: project.members.length + 1, // +1 for the owner
+            memberCount: project.members.length,
             taskCount: project.tasks.length,
             createdAt: project.createdAt,
         }));
@@ -317,10 +310,8 @@ export class ProjectsService {
     /**
      * Get all members of a project (including owner)
      */
-    public async getMembers(
-    projectId: number
-): Promise<ProjectMemberDto[]> {
-    const project: ProjectWithMembersAndOwner | null = await this.prisma.project.findUnique({
+    public async getMembers(projectId: number): Promise<ProjectMemberDto[]> {
+    const project = await this.prisma.project.findUnique({
         where: { id: projectId },
         include: projectMemberInclude,
     });
@@ -329,21 +320,13 @@ export class ProjectsService {
         throw new NotFoundException(`Project with ID ${projectId} not found`);
     }
 
-    const members: ProjectMemberDto[] = [
-        {
-            id: project.owner.id,
-            email: project.owner.email,
-            isOwner: true,
-        },
-        // FIX: 'm' is automatically typed, so m.user.id and m.user.email are valid
-        ...project.members.map((m) => ({
-            id: m.user.id,
-            email: m.user.email,
-            isOwner: false,
-        })),
-    ];
-
-    return members;
+    // Map directly from the members table only
+    return project.members.map((m) => ({
+        id: m.user.id,
+        email: m.user.email,
+        // Instead of hardcoding 'false', check if this user is the owner
+        isOwner: m.user.id === project.ownerId, 
+    }));
 }
 
     /**
@@ -381,10 +364,13 @@ export class ProjectsService {
     return isOwner || isMember;
     }
 
-    /**
-     * Helper method to map project to detail response DTO
-     */
-    private mapToDetailResponse(project: ProjectWithDetail): ProjectDetailResponseDto {
+    
+/**
+ * Helper method to map project to detail response DTO
+ * * Now that the owner is stored in the ProjectMember table,
+ * we simply map the members array directly.
+ */
+private mapToDetailResponse(project: ProjectWithDetail): ProjectDetailResponseDto {
     return {
         id: project.id,
         title: project.title,
@@ -394,7 +380,7 @@ export class ProjectsService {
             id: project.owner.id,
             email: project.owner.email,
         },
-        // FIX: 'm' is now automatically typed; no need for (m: any)
+        // We just map the members directly from the DB.
         members: project.members.map((m) => ({
             id: m.user.id,
             email: m.user.email,
