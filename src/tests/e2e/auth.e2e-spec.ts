@@ -15,6 +15,7 @@ describe('AuthController (e2e)', () => {
   const testUser = {
     email: 'e2e-auth@example.com',
     password: 'Password123!',
+    fullName: 'Test User'
   };
 
  beforeAll(async () => {
@@ -49,6 +50,7 @@ describe('AuthController (e2e)', () => {
         .send({
           email: 'invalid-email',
           password: 'Password123!',
+          fullName: 'John Doe'
         })
         .expect(400));
   });

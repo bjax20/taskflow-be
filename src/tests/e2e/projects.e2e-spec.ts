@@ -16,6 +16,7 @@ describe('Projects (e2e)', () => {
   const testUserCredentials = {
     email: 'project-owner@test.com',
     password: 'Password123!',
+    fullName: 'Project Owner'
   };
 
   beforeAll(async () => {
@@ -114,7 +115,8 @@ describe('Projects (e2e)', () => {
         update: {},
         create: {
           email: collaboratorEmail,
-          password: 'Password123!', // Hash this if your service requires it
+          password: 'Password123!',
+          fullName: 'Collaborator User',
         },
       });
     });
@@ -143,12 +145,18 @@ describe('Projects (e2e)', () => {
         .expect(409)
     );
   });
-  afterAll(async () => {
+ afterAll(async () => {
     try {
-      // Clean up test data
-      if (prisma && userId) {
-        await prisma.project.deleteMany({ where: { ownerId: userId } }).catch(() => {/* ignore cleanup errors */});
-        await prisma.user.deleteMany({ where: { id: userId } }).catch(() => {/* ignore cleanup errors */});
+      if (prisma) {
+        // Clean up both the owner and the collaborator in one go
+        await prisma.user.deleteMany({
+          where: {
+            OR: [
+              { id: userId },
+              { email: 'colleague@test.com' } // The collaboratorEmail variable
+            ],
+          },
+        }).catch(() => {/* ignore cleanup errors */});
       }
     } catch (error) {
       console.error('Error during cleanup:', error);
