@@ -1,33 +1,57 @@
-import { describe, it, expect, beforeEach } from "@jest/globals";
-import { prisma } from "../setup";
-import { cleanDatabase } from "../setup";
+import { describe, it, expect, beforeEach, jest } from "@jest/globals";
+import { createRegisterDto } from "../../tests/factories/auth.factory";
+import { prisma, cleanDatabase } from "../setup";
+
 
 describe("Prisma Schema Constraints (Integration)", () => {
-    jest.setTimeout(20000); // Give it 20 seconds instead of 5
+    // Increase timeout for DB operations
+    jest.setTimeout(20000);
+
     beforeEach(async () => {
         await cleanDatabase();
     });
 
-    it("should enforce unique email constraint", async () => {
-        const userData = {
+    it("should enforce unique email constraint", async (): Promise<void> => {
+        // Use Factory for base data
+        const userData = createRegisterDto({
             email: "bill@billdev.online",
-            password: "hashed_password",
-        };
-        await prisma.user.create({ data: userData });
+        });
 
-        // TDD: This MUST fail
-        await expect(prisma.user.create({ data: userData })).rejects.toThrow();
+        // Prisma needs the password but we don't want to expose it in the return
+        // usually, but here we are testing the DB directly.
+        await prisma.user.create({
+            data: {
+                email: userData.email,
+                password: userData.password,
+                fullName: userData.fullName,
+            }
+        });
+
+        // TDD: This MUST fail due to unique constraint
+        await expect(
+            prisma.user.create({
+                data: {
+                    email: userData.email,
+                    password: userData.password,
+                    fullName: userData.fullName,
+                }
+            })
+        ).rejects.toThrow();
     });
 
-    it("should only allow valid TaskStatus enums", async () => {
+    it("should only allow valid TaskStatus enums", async (): Promise<void> => {
+        // ✅ Use Factory to generate valid owner data for the nested create
+        const ownerData = createRegisterDto();
+
         // 1. Atomic Create: Project and Owner in one transaction
         const projectWithUser = await prisma.project.create({
             data: {
                 title: "Enum Test Project",
                 owner: {
                     create: {
-                        email: `schema-test-${Date.now()}-${Math.random()}@test.com`,
-                        password: "123",
+                        email: `schema-test-${Date.now()}@test.com`,
+                        password: ownerData.password,
+                        fullName: ownerData.fullName,
                     },
                 },
             },
@@ -45,13 +69,11 @@ describe("Prisma Schema Constraints (Integration)", () => {
         expect(task.status).toBe("TODO");
 
         // 3. Test Invalid Enum
-
         await expect(
             prisma.task.create({
                 data: {
                     title: "Invalid Task",
-                    // @ts-expect-error because we are INTENTIONALLY breaking the type
-                    // to verify that the DATABASE (Prisma/MySQL) enforces the constraint.
+                    // @ts-expect-error - Intentionally breaking types to test DB enforcement
                     status: "INVALID_STATUS",
                     project: { connect: { id: projectWithUser.id } },
                 },

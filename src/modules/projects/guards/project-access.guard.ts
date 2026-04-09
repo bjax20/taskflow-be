@@ -44,7 +44,7 @@ export class ProjectAccessGuard implements CanActivate {
 
     if (!userId || isNaN(projectId)) {
       console.error('GUARD FAILED: Missing userId or ProjectId is NaN');
-      return false;
+    return false;
     }
 
     const hasAccess = await this.projectsService.isMemberOrOwner(

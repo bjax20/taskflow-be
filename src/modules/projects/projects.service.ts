@@ -15,19 +15,19 @@ import { ProjectMemberDto } from "./dto/response/project-member.dto";
 
 const projectInclude = {
     members: true,
-    owner: { select: { id: true, email: true } },
+    owner: { select: { id: true, email: true, fullName: true } },
     tasks: true,
 } satisfies Prisma.ProjectInclude;
 
 // Define the shape of the include
 const projectMemberInclude = {
     owner: {
-        select: { id: true, email: true },
+        select: { id: true, email: true, fullName: true },
     },
     members: {
         include: {
             user: {
-                select: { id: true, email: true },
+                select: { id: true, email: true, fullName: true },
             },
         },
     },
@@ -39,10 +39,10 @@ const projectMemberInclude = {
 
 // Define the inclusion once
 const projectDetailInclude = {
-    owner: { select: { id: true, email: true } },
+    owner: { select: { id: true, email: true, fullName: true } },
     members: {
         include: {
-            user: { select: { id: true, email: true } },
+            user: { select: { id: true, email: true, fullName: true } },
         },
     },
     tasks: true,
@@ -86,7 +86,7 @@ export class ProjectsService {
             // THIS IS THE MISSING PIECE:
             members: {
                 create: {
-                    userId: userId,
+                    userId,
                 },
             },
         },
@@ -184,36 +184,24 @@ export class ProjectsService {
      * Update a project
      */
     public async update(
-        projectId: number,
-        updateProjectDto: UpdateProjectDto,
-    ): Promise<ProjectDetailResponseDto> {
-        const project = await this.prisma.project.update({
-            where: { id: projectId },
-            data: {
-                ...(updateProjectDto.title && {
-                    title: updateProjectDto.title,
-                }),
-                ...(updateProjectDto.description !== undefined && {
-                    description: updateProjectDto.description,
-                }),
-            },
-            include: {
-                owner: {
-                    select: { id: true, email: true },
-                },
-                members: {
-                    include: {
-                        user: {
-                            select: { id: true, email: true },
-                        },
-                    },
-                },
-                tasks: true,
-            },
-        });
+    projectId: number,
+    updateProjectDto: UpdateProjectDto,
+): Promise<ProjectDetailResponseDto> {
+    const project = await this.prisma.project.update({
+        where: { id: projectId },
+        data: {
+            ...(updateProjectDto.title && {
+                title: updateProjectDto.title,
+            }),
+            ...(updateProjectDto.description !== undefined && {
+                description: updateProjectDto.description,
+            }),
+        },
+        include: projectDetailInclude,
+    });
 
-        return this.mapToDetailResponse(project);
-    }
+    return this.mapToDetailResponse(project);
+}
 
     /**
      * Delete a project and all its associated data
@@ -261,7 +249,7 @@ export class ProjectsService {
         },
         include: {
             user: {
-                select: { id: true, email: true },
+                select: { id: true, email: true, fullName: true },
             },
         },
     });
@@ -271,7 +259,11 @@ export class ProjectsService {
         member: {
             userId: membership.userId,
             projectId: membership.projectId,
-            user: membership.user,
+            user: {
+                id: membership.user.id,
+                email: membership.user.email,
+                fullName: membership.user.fullName,
+            },
         },
     };
     }
@@ -310,7 +302,7 @@ export class ProjectsService {
     /**
      * Get all members of a project (including owner)
      */
-    public async getMembers(projectId: number): Promise<ProjectMemberDto[]> {
+   public async getMembers(projectId: number): Promise<ProjectMemberDto[]> {
     const project = await this.prisma.project.findUnique({
         where: { id: projectId },
         include: projectMemberInclude,
@@ -320,12 +312,11 @@ export class ProjectsService {
         throw new NotFoundException(`Project with ID ${projectId} not found`);
     }
 
-    // Map directly from the members table only
     return project.members.map((m) => ({
         id: m.user.id,
         email: m.user.email,
-        // Instead of hardcoding 'false', check if this user is the owner
-        isOwner: m.user.id === project.ownerId, 
+        fullName: m.user.fullName,
+        isOwner: m.user.id === project.ownerId,
     }));
 }
 
@@ -364,7 +355,7 @@ export class ProjectsService {
     return isOwner || isMember;
     }
 
-    
+
 /**
  * Helper method to map project to detail response DTO
  * * Now that the owner is stored in the ProjectMember table,
@@ -374,16 +365,17 @@ private mapToDetailResponse(project: ProjectWithDetail): ProjectDetailResponseDt
     return {
         id: project.id,
         title: project.title,
-        description: project.description ?? '', // Nullish coalescing for safety
+        description: project.description ?? '',
         ownerId: project.ownerId,
         owner: {
             id: project.owner.id,
             email: project.owner.email,
+            fullName: project.owner.fullName,
         },
-        // We just map the members directly from the DB.
         members: project.members.map((m) => ({
             id: m.user.id,
             email: m.user.email,
+            fullName: m.user.fullName,
         })),
         taskCount: project.tasks.length,
         createdAt: project.createdAt,

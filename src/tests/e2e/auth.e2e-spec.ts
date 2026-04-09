@@ -4,7 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AppModule } from '../../modules/app.module';
-
+import { createRegisterDto } from '../../tests/factories/auth.factory';
 // Increase timeout for auth tests (they may involve DB operations)
 jest.setTimeout(30000);
 
@@ -12,11 +12,7 @@ describe('AuthController (e2e)', () => {
   let app: NestFastifyApplication;
   let prisma: PrismaService | undefined;
 
-  const testUser = {
-    email: 'e2e-auth@example.com',
-    password: 'Password123!',
-    fullName: 'Test User'
-  };
+  const validUser = createRegisterDto({ email: 'e2e-auth@example.com' });
 
  beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -40,57 +36,57 @@ describe('AuthController (e2e)', () => {
     // Now prisma is defined and can be used
     if (prisma) {
       await prisma.user.deleteMany({
-        where: { email: testUser.email }
+        where: { email: validUser.email }
       });
     }
   });
   describe('Signup Validation', () => {
-    it('should return 400 for invalid email', async () => request(app.getHttpServer())
+    it('should return 400 for invalid email', async () =>
+      request(app.getHttpServer())
         .post('/api/v1/auth/register')
-        .send({
-          email: 'invalid-email',
-          password: 'Password123!',
-          fullName: 'John Doe'
-        })
-        .expect(400));
+        .send(createRegisterDto({ email: 'invalid-email' }))
+        .expect(400)
+    );
   });
 
-  it('/api/v1/auth/signup (POST) - Register a new user', async () => request(app.getHttpServer())
+  it('/api/v1/auth/register (POST) - Register a new user', async () =>
+    request(app.getHttpServer())
       .post('/api/v1/auth/register')
-      .send(testUser)
+      .send(validUser)
       .expect(201)
       .then((res) => {
         expect(res.body).toHaveProperty('id');
-        expect(res.body.email).toBe(testUser.email);
-      }));
+        expect(res.body.email).toBe(validUser.email);
+      })
+  );
 
-  it('/api/v1/auth/login (POST) - Get JWT token', async () => request(app.getHttpServer())
+  it('/api/v1/auth/login (POST) - Get JWT token', async () =>
+    request(app.getHttpServer())
       .post('/api/v1/auth/login')
-      .send(testUser)
+      .send({ email: validUser.email, password: validUser.password })
       .expect(200)
       .then((res) => {
         expect(res.body).toHaveProperty('access_token');
-      }));
+      })
+  );
 
   afterAll(async () => {
     try {
-      // Clean up test user
       if (prisma) {
-        await prisma.user.deleteMany({ where: { email: testUser.email } }).catch(() => {
+        await prisma.user.deleteMany({ where: { email: validUser.email } }).catch(() => {
             /* ignore cleanup errors */
         });
       }
     } catch (error) {
       console.error('Error during cleanup:', error);
     } finally {
-      // Close Fastify instance first
       if (app && app.getHttpAdapter()) {
         await app.getHttpAdapter().getInstance().close();
       }
-      // Then close the app
       if (app) {
         await app.close();
       }
     }
   });
+
 });

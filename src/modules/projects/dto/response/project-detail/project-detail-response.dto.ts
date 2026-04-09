@@ -1,7 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { ProjectMemberInDetailDto } from "./project-member-in-detail.dto";
-import { UserInDetailedProjectDto } from "./user-in-detailed-project.dto";
-
+import { UserBaseDto } from "../../../../users/dto/user-base.dto";
 
 export class ProjectDetailResponseDto {
     @ApiProperty({ example: 1, description: "Project ID" })
@@ -16,11 +14,11 @@ export class ProjectDetailResponseDto {
     @ApiProperty({ example: 42 })
     public ownerId!: number;
 
-    @ApiProperty({ type: UserInDetailedProjectDto })
-    public owner!: UserInDetailedProjectDto;
+    @ApiProperty({ type: UserBaseDto })
+    public owner!: UserBaseDto;
 
-    @ApiProperty({ type: [ProjectMemberInDetailDto] })
-    public members!: ProjectMemberInDetailDto[];
+    @ApiProperty({ type: [UserBaseDto] })
+    public members!: UserBaseDto[];
 
     @ApiProperty({ example: 23 })
     public taskCount!: number;
