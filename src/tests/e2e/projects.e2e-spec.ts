@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AppModule } from '../../modules/app.module';
+import { createRegisterDto } from '../../tests/factories/auth.factory';
 
 jest.setTimeout(30000);
 
@@ -11,58 +12,50 @@ describe('Projects (e2e)', () => {
   let app: NestFastifyApplication;
   let prisma: PrismaService;
   let token: string;
-  let userId: number;
+  // let userId: number;
 
-  const testUserCredentials = {
+  const ownerData = createRegisterDto({
     email: 'project-owner@test.com',
-    password: 'Password123!',
     fullName: 'Project Owner'
-  };
+  });
 
-  beforeAll(async () => {
+  const collaboratorData = createRegisterDto({
+    email: 'colleague@test.com',
+    fullName: 'Collaborator User'
+  });
+
+  beforeAll(async (): Promise<void> => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
-    // Use FastifyAdapter (matches auth and app specs)
-    const fastifyAdapter = new FastifyAdapter();
-
     app = moduleFixture.createNestApplication<NestFastifyApplication>(
-      fastifyAdapter,
+      new FastifyAdapter(),
     );
 
-    // Set global prefix BEFORE init
     app.setGlobalPrefix('/api/v1');
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
-    // Add validation pipes
-    app.useGlobalPipes(new ValidationPipe());
-
-    // Initialize the app
     await app.init();
-
-    // CRITICAL: Wait for Fastify to be ready
     await app.getHttpAdapter().getInstance().ready();
 
     prisma = app.get<PrismaService>(PrismaService);
 
-    // Clean up any existing test user
-    await prisma.user.deleteMany({ where: { email: testUserCredentials.email } }).catch(() => {
-        /* ignore cleanup errors */
-    });
+    await prisma.user.deleteMany({
+      where: { email: { in: [ownerData.email, collaboratorData.email] } }
+    }).catch(() => { /* ignore */ });
 
-    // Setup: Create a test user and get token
-    // Use global prefix-aware path
-    const signupRes = await request(app.getHttpServer())
+    await request(app.getHttpServer())
       .post('/api/v1/auth/register')
-      .send(testUserCredentials)
+      .send(ownerData)
       .expect(201);
 
-    userId = signupRes.body.id;
-
-    // Login to get token
     const loginRes = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
-      .send(testUserCredentials)
+      .send({
+        email: ownerData.email,
+        password: ownerData.password
+      })
       .expect(200);
 
     token = loginRes.body.access_token;
@@ -71,7 +64,8 @@ describe('Projects (e2e)', () => {
   describe('Lifecycle: Create -> Read -> Delete', () => {
     let projectId: number;
 
-    it('POST /api/v1/projects - Should create project', async () => request(app.getHttpServer())
+    it('POST /api/v1/projects - Should create project', async () =>
+      request(app.getHttpServer())
         .post('/api/v1/projects')
         .set('Authorization', `Bearer ${token}`)
         .send({ title: 'E2E Project', description: 'Testing' })
@@ -79,93 +73,93 @@ describe('Projects (e2e)', () => {
         .then((res) => {
           projectId = res.body.id;
           expect(res.body.title).toBe('E2E Project');
-        }));
+        })
+    );
 
-    it('GET /api/v1/projects/:id - Should allow access to owner', async () => request(app.getHttpServer())
+    it('GET /api/v1/projects/:id - Should allow access to owner', async () =>
+      request(app.getHttpServer())
         .get(`/api/v1/projects/${projectId}`)
         .set('Authorization', `Bearer ${token}`)
-        .expect(200));
+        .expect(200)
+    );
 
-    it('GET /api/v1/projects/9999 - Should return 404 for non-existent/unauthorized', async () => request(app.getHttpServer())
+    it('GET /api/v1/projects/9999 - Should return 404', async () =>
+      request(app.getHttpServer())
         .get('/api/v1/projects/9999')
         .set('Authorization', `Bearer ${token}`)
-        .expect(404));
+        .expect(404)
+    );
 
-    it('DELETE /api/v1/projects/:id - Should allow owner to delete', async () => request(app.getHttpServer())
+    it('DELETE /api/v1/projects/:id - Should allow owner to delete', async () =>
+      request(app.getHttpServer())
         .delete(`/api/v1/projects/${projectId}`)
         .set('Authorization', `Bearer ${token}`)
-        .expect(204));
+        .expect(204)
+    );
   });
 
   describe('Member Management', () => {
     let projectId: number;
-    const collaboratorEmail = 'colleague@test.com';
 
     beforeAll(async () => {
-      // Create a project to add members to
+      // Create project
       const res = await request(app.getHttpServer())
         .post('/api/v1/projects')
         .set('Authorization', `Bearer ${token}`)
         .send({ title: 'Collaboration Project' });
       projectId = res.body.id;
 
-      // Create the collaborator user in the DB directly so they "exist"
+      // Create collaborator in DB
       await prisma.user.upsert({
-        where: { email: collaboratorEmail },
+        where: { email: collaboratorData.email },
         update: {},
-        create: {
-          email: collaboratorEmail,
-          password: 'Password123!',
-          fullName: 'Collaborator User',
-        },
+        create: { ...collaboratorData },
       });
     });
 
-    it('POST /api/v1/projects/:id/members - Should add member via email', async () => request(app.getHttpServer())
+    it('POST /api/v1/projects/:id/members - Should add member via email', async () =>
+      request(app.getHttpServer())
         .post(`/api/v1/projects/${projectId}/members`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ email: collaboratorEmail }) // THE NEW CONTRACT
+        .send({ email: collaboratorData.email })
         .expect(201)
         .then((res) => {
-          expect(res.body.member.user.email).toBe(collaboratorEmail);
-        }));
+          expect(res.body.member.user.email).toBe(collaboratorData.email);
+        })
+    );
 
-    it('POST /api/v1/projects/:id/members - Should return 404 for non-existent email', async () => request(app.getHttpServer())
+    it('POST /api/v1/projects/:id/members - Should return 404 for ghost email', async () =>
+      request(app.getHttpServer())
         .post(`/api/v1/projects/${projectId}/members`)
         .set('Authorization', `Bearer ${token}`)
         .send({ email: 'ghost@notfound.com' })
-        .expect(404));
+        .expect(404)
+    );
 
-    it('POST /api/v1/projects/:id/members - Should return 409 for duplicate member', async () =>
-      // Try to add the same person again
-       request(app.getHttpServer())
+    it('POST /api/v1/projects/:id/members - Should return 409 for duplicate', async () =>
+      request(app.getHttpServer())
         .post(`/api/v1/projects/${projectId}/members`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ email: collaboratorEmail })
+        .send({ email: collaboratorData.email })
         .expect(409)
     );
   });
- afterAll(async () => {
+
+  afterAll(async () => {
     try {
       if (prisma) {
-        // Clean up both the owner and the collaborator in one go
         await prisma.user.deleteMany({
           where: {
-            OR: [
-              { id: userId },
-              { email: 'colleague@test.com' } // The collaboratorEmail variable
-            ],
+            email: { in: [ownerData.email, collaboratorData.email] },
           },
-        }).catch(() => {/* ignore cleanup errors */});
+        }).catch(() => {/* ignore */});
       }
     } catch (error) {
       console.error('Error during cleanup:', error);
     } finally {
-      // Close Fastify instance first
       if (app && app.getHttpAdapter()) {
         await app.getHttpAdapter().getInstance().close();
       }
-      // Then close the app
       if (app) {
         await app.close();
       }

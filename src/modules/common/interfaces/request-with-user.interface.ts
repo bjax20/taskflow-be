@@ -8,6 +8,7 @@ export interface RequestWithUser extends Request {
   user: {
     userId: string;
     email: string;
+    fullName: string;
     // Add other fields if JWT strategy returns them (e.g., name, role)
   };
 }

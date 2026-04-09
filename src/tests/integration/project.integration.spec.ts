@@ -5,11 +5,11 @@ import {
     NestFastifyApplication,
 } from "@nestjs/platform-fastify";
 import { Test, TestingModule } from "@nestjs/testing";
-
 import * as bcrypt from "bcrypt";
 import request from "supertest";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { AppModule } from "../../modules/app.module";
+import { createRegisterDto } from "../../tests/factories/auth.factory";
 
 describe("Project System (Integration)", () => {
     let app: NestFastifyApplication;
@@ -19,7 +19,7 @@ describe("Project System (Integration)", () => {
     let userId: number;
     let PREFIX: string;
 
-    beforeAll(async () => {
+    beforeAll(async (): Promise<void> => {
         const moduleFixture: TestingModule = await Test.createTestingModule({
             imports: [AppModule],
         }).compile();
@@ -28,14 +28,10 @@ describe("Project System (Integration)", () => {
             new FastifyAdapter(),
         );
 
-        //  Get ConfigService
         configService = moduleFixture.get<ConfigService>(ConfigService);
-
-        // Read from env with fallback (type-safe)
         PREFIX = configService.get<string>("API_PREFIX", "/api/v1");
 
         app.setGlobalPrefix(PREFIX);
-
         app.useGlobalPipes(
             new ValidationPipe({ whitelist: true, transform: true }),
         );
@@ -46,37 +42,46 @@ describe("Project System (Integration)", () => {
         prisma = moduleFixture.get<PrismaService>(PrismaService);
     });
 
-    beforeEach(async () => {
-        // ensure to delete the dependencies first
+    beforeEach(async (): Promise<void> => {
+        // Clean database in order of dependency
         await prisma.projectMember.deleteMany({});
         await prisma.task.deleteMany({});
         await prisma.project.deleteMany({});
         await prisma.user.deleteMany({});
 
-        const email = `test-${Date.now()}@example.com`;
-        const password = "Test@1234";
-        const hashedPassword = await bcrypt.hash(password, 10);
+        // Use Factory for user data
+        const userData = createRegisterDto({
+            email: `test-${Date.now()}@example.com`,
+        });
+        const hashedPassword = await bcrypt.hash(userData.password, 10);
 
         const user = await prisma.user.create({
-            data: { email, password: hashedPassword },
+            data: {
+                email: userData.email,
+                password: hashedPassword,
+                fullName: userData.fullName,
+            },
         });
         userId = user.id;
 
+        // Login using factory credentials
         const loginRes = await app.inject({
             method: "POST",
             url: `${PREFIX}/auth/login`,
-            payload: { email, password },
+            payload: {
+                email: userData.email,
+                password: userData.password
+            },
         });
 
         if (loginRes.statusCode !== 200) {
-            console.error("DEBUG:", loginRes.payload);
             throw new Error(`Login failed: ${loginRes.statusCode}`);
         }
 
         authToken = loginRes.json().access_token;
     });
 
-    it("POST /projects should create a project (inject)", async () => {
+    it("POST /projects should create a project (inject)", async (): Promise<void> => {
         const res = await app.inject({
             method: "POST",
             url: `${PREFIX}/projects`,
@@ -91,7 +96,8 @@ describe("Project System (Integration)", () => {
         expect(body.ownerId).toBe(userId);
     });
 
-    it("POST /projects should create a project (supertest)", async () => {
+    it("POST /projects should create a project (supertest)", async (): Promise<void> => {
+        // ✅ Explicit return for linter
         const res = await request(app.getHttpServer())
             .post(`${PREFIX}/projects`)
             .set("Authorization", `Bearer ${authToken}`)
@@ -101,7 +107,7 @@ describe("Project System (Integration)", () => {
         expect(res.body.ownerId).toBe(userId);
     });
 
-    afterAll(async () => {
+    afterAll(async (): Promise<void> => {
         if (prisma) {
             await prisma.$disconnect();
         }

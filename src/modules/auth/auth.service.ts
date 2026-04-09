@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { USER_SAFE_SELECT } from "./constants/user.constants";
 import { RegisterDto } from "./dto/register.dto";
 
 @Injectable()
@@ -12,21 +13,17 @@ export class AuthService {
     ) {}
 
     public async register(dto: RegisterDto) {
-        const { email, password, fullName } = dto;
+        // Extract only what you need to transform (password)
+        const { password, ...userData } = dto;
         const hashedPassword = await bcrypt.hash(password, 10);
 
+        // Spread the rest of the userData automatically
         return this.prisma.user.create({
             data: {
-                email,
+                ...userData,
                 password: hashedPassword,
-                fullName
             },
-            select: {
-                id: true,
-                email: true,
-                fullName: true,
-                createdAt: true
-            },
+            select: USER_SAFE_SELECT,
         });
     }
 

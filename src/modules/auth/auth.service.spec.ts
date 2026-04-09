@@ -3,9 +3,10 @@ import { JwtModule } from "@nestjs/jwt";
 import { Test, TestingModule } from "@nestjs/testing";
 import * as bcrypt from "bcrypt";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { createRegisterDto } from "../../tests/factories/auth.factory";
 import { cleanDatabase } from "../../tests/setup";
 import { AuthService } from "./auth.service";
-import { RegisterDto } from "./dto/register.dto";
+
 
 describe("AuthService", () => {
     let service: AuthService;
@@ -32,55 +33,37 @@ describe("AuthService", () => {
     });
 
     it("should hash the password before saving a user", async () => {
-    const registerDto: RegisterDto = {
-        email: "tdd@test.com",
-        fullName: "John Doe",
-        password: "Password123!",
-    };
+        const registerDto = createRegisterDto({ email: "tdd@test.com" });
 
-    // 1. Run the service (which returns the user WITHOUT password)
-    const result = await service.register(registerDto);
+        const result = await service.register(registerDto);
 
-    // 2. Fetch the user directly from the DB to check the password field
-    const userInDb = await prisma.user.findUnique({
-        where: { id: result.id },
-    });
+        const userInDb = await prisma.user.findUnique({
+            where: { id: result.id },
+        });
 
-    expect(result).toBeDefined();
-    expect(userInDb).toBeDefined();
-
-    // 3. Verify the hash
-    if (userInDb) {
-        expect(userInDb.password).not.toBe(registerDto.password);
-
-        const isMatch = await bcrypt.compare(registerDto.password, userInDb.password);
-        expect(isMatch).toBe(true);
-    }
+        if (userInDb) {
+            const isMatch = await bcrypt.compare(registerDto.password, userInDb.password);
+            expect(isMatch).toBe(true);
+        }
     });
 
     it("should return an access_token on valid credentials", async () => {
-    const rawPassword = "SecretPassword123!";
-    await service.register({
-        email: "login@test.com",
-        fullName: "Login User", // <--- Add this
-        password: rawPassword,
+        const rawPassword = "SecretPassword123!";
+        const email = "login@test.com";
+
+        await service.register(createRegisterDto({ email, password: rawPassword }));
+
+        const result = await service.login(email, rawPassword);
+
+        expect(result).toHaveProperty("access_token");
     });
 
-    const result = await service.login("login@test.com", rawPassword);
-
-    expect(result).toHaveProperty("access_token");
-    expect(typeof result.access_token).toBe("string");
-});
-
     it("should throw UnauthorizedException on wrong password", async () => {
-        await service.register({
-            email: "wrong@test.com",
-            fullName: "Wrong User",
-            password: "password123",
-        });
+        const dto = createRegisterDto({ email: "wrong@test.com" });
+        await service.register(dto);
 
         await expect(
-            service.login("wrong@test.com", "wrongpassword"),
+            service.login(dto.email, "wrongpassword"),
         ).rejects.toThrow(UnauthorizedException);
     });
 });

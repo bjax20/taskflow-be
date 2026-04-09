@@ -6,6 +6,7 @@ export interface AddMemberResponse {
         user: {
             id: number;
             email: string;
+            fullName: string;
         };
     };
 }
