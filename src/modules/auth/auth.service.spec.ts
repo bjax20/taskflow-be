@@ -34,6 +34,7 @@ describe("AuthService", () => {
     it("should hash the password before saving a user", async () => {
     const registerDto: RegisterDto = {
         email: "tdd@test.com",
+        fullName: "John Doe",
         password: "Password123!",
     };
 
@@ -58,21 +59,23 @@ describe("AuthService", () => {
     });
 
     it("should return an access_token on valid credentials", async () => {
-        const rawPassword = "SecretPassword123!";
-        await service.register({
-            email: "login@test.com",
-            password: rawPassword,
-        });
-
-        const result = await service.login("login@test.com", rawPassword);
-
-        expect(result).toHaveProperty("access_token");
-        expect(typeof result.access_token).toBe("string");
+    const rawPassword = "SecretPassword123!";
+    await service.register({
+        email: "login@test.com",
+        fullName: "Login User", // <--- Add this
+        password: rawPassword,
     });
+
+    const result = await service.login("login@test.com", rawPassword);
+
+    expect(result).toHaveProperty("access_token");
+    expect(typeof result.access_token).toBe("string");
+});
 
     it("should throw UnauthorizedException on wrong password", async () => {
         await service.register({
             email: "wrong@test.com",
+            fullName: "Wrong User",
             password: "password123",
         });
 

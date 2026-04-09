@@ -8,19 +8,25 @@ import { RegisterDto } from "./dto/register.dto";
 export class AuthService {
     public constructor(
         private readonly jwtService: JwtService,
-        private readonly prisma: PrismaService, // ← Inject PrismaService
+        private readonly prisma: PrismaService,
     ) {}
 
     public async register(dto: RegisterDto) {
-        const { email, password } = dto;
+        const { email, password, fullName } = dto;
         const hashedPassword = await bcrypt.hash(password, 10);
 
         return this.prisma.user.create({
-            data: { email, password: hashedPassword },select: {
-            id: true,
-            email: true,
-            createdAt: true
-        }, // do not include the password
+            data: {
+                email,
+                password: hashedPassword,
+                fullName
+            },
+            select: {
+                id: true,
+                email: true,
+                fullName: true,
+                createdAt: true
+            },
         });
     }
 

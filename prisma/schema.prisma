@@ -11,6 +11,7 @@ model User {
   id            Int             @id @default(autoincrement())
   email         String          @unique
   password      String
+  fullName  String   @default("New User")
   ownedProjects Project[]       @relation("ProjectOwner")
   projects      ProjectMember[]
   tasks         Task[]
