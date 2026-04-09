@@ -60,13 +60,30 @@ function createSwagger(app: INestApplication) {
  * parsing middleware.
  */
 async function bootstrap(): Promise<void> {
-
     const app = await NestFactory.create<NestFastifyApplication>(
         AppModule,
         new FastifyAdapter()
     );
 
-    // @todo Enable Helmet for better API security headers
+    // ADD CORS CONFIGURATION
+    // This allows your React/Next.js frontend to talk to your Fastify backend
+    app.enableCors({
+        origin: [
+            'http://localhost:4000', // Frontend Dev Port
+            'http://localhost:3000', // Alternative Port
+            'https://tapos.work', // Your Portfolio/Production site
+        ],
+        methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+        credentials: true, // Allows cookies and Authorization headers
+    });
+
+    // TODO: HELMET SECURITY
+    // Since I have a @todo for Helmet, it's highly advised for api.tapos.work
+    // Note: I'll need to run 'npm install @fastify/helmet'
+    // import helmet from '@fastify/helmet';
+    // await app.register(helmet, {
+    //   contentSecurityPolicy: false, // Disable if it interferes with Swagger
+    // });
 
     app.setGlobalPrefix(process.env.API_PREFIX || API_DEFAULT_PREFIX);
 
@@ -76,8 +93,20 @@ async function bootstrap(): Promise<void> {
 
     const logInterceptor = app.select(CommonModule).get(LogInterceptor);
     app.useGlobalInterceptors(logInterceptor);
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
-    await app.listen(process.env.API_PORT || API_DEFAULT_PORT, '0.0.0.0');
+
+    // ENHANCED VALIDATION PIPE
+    // Adding 'transform: true' ensures your string IDs from params become numbers
+    app.useGlobalPipes(new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true // Required for your findById(Number(id)) logic
+    }));
+
+    // Listen on 0.0.0.0 to allow access within Docker or external networks
+    const port = process.env.API_PORT || API_DEFAULT_PORT;
+    await app.listen(port, '0.0.0.0');
+    console.log(`🚀 Application is running on: http://localhost:${port}${API_DEFAULT_PREFIX}`);
+    console.log(`📝 Swagger docs available at: http://localhost:${port}${SWAGGER_PREFIX}`);
 }
 
 /**
