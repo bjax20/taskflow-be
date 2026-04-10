@@ -192,9 +192,11 @@ export class ProjectsController {
         @Query("limit") limit: number = 10,
         @Query("role") role: "owner" | "member" | "all" = "all",
     ): Promise<PaginatedResponse<ProjectResponseDto>> {
+        const pageNumber = Number(page) || 1;
+        const limitNumber = Number(limit) || 10;
         return this.projectsService.findAll(Number(req.user.userId), {
-            page,
-            limit: Math.min(limit, 50),
+            page: pageNumber,
+            limit: Math.min(limitNumber, 50),
             role,
         });
     }
