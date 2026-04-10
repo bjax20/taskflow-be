@@ -76,6 +76,7 @@ async function bootstrap(): Promise<void> {
         ],
         methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
         credentials: true, // Allows cookies and Authorization headers
+        maxAge: 86400,
     });
 
     // TODO: HELMET SECURITY
