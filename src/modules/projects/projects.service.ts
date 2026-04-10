@@ -137,7 +137,7 @@ export class ProjectsService {
                 include: projectInclude,
                 orderBy: { createdAt: "desc" },
                 take: limit,
-                skip: skip,
+                skip,
             }),
             this.prisma.project.count({ where: whereConditions }),
         ]);

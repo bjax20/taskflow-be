@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Task } from '@prisma/client';
+import { Task, TaskStatus } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateTaskDto } from './dto/request/create-task.dto';
 import { UpdateTaskStatusDto } from './dto/request/update-task-status.dto';
@@ -43,6 +43,7 @@ export class TasksService {
         data: {
           title: dto.title,
           description: dto.description,
+          status: dto.status || TaskStatus.TODO,
           projectId,
           assigneeId: dto.assigneeId,
         },
@@ -232,32 +233,32 @@ export class TasksService {
   });
 }
 
-public async findTaskLogs(projectId: number, taskId: number, userId: number) {
-  // 1. Standard Auth Checks
-  const project = await this.prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new NotFoundException('Project not found');
+  public async findTaskLogs(projectId: number, taskId: number, userId: number) {
+    // 1. Standard Auth Checks
+    const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) throw new NotFoundException('Project not found');
 
-  const membership = await this.prisma.projectMember.findFirst({
-    where: { projectId, userId },
-  });
-  if (!membership) throw new ForbiddenException('Access denied');
+    const membership = await this.prisma.projectMember.findFirst({
+      where: { projectId, userId },
+    });
+    if (!membership) throw new ForbiddenException('Access denied');
 
-  // 2. Task-Project Integrity Check
-  const task = await this.prisma.task.findUnique({ where: { id: taskId } });
-  if (!task || task.projectId !== projectId) {
-    throw new NotFoundException('Task not found in this project');
+    // 2. Task-Project Integrity Check
+    const task = await this.prisma.task.findUnique({ where: { id: taskId } });
+    if (!task || task.projectId !== projectId) {
+      throw new NotFoundException('Task not found in this project');
+    }
+
+    // 3. Fetch specific task history
+    return this.prisma.changelog.findMany({
+      where: {
+        taskId,
+        projectId
+      },
+      include: {
+        user: { select: { email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
   }
-
-  // 3. Fetch specific task history
-  return this.prisma.changelog.findMany({
-    where: {
-      taskId,
-      projectId
-    },
-    include: {
-      user: { select: { email: true } },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-}
-}
+  }
