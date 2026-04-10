@@ -69,14 +69,15 @@ async function bootstrap(): Promise<void> {
     // ADD CORS CONFIGURATION
     // This allows your React/Next.js frontend to talk to your Fastify backend
     app.enableCors({
-        origin: [
-            'http://localhost:4000', // Frontend Dev Port
-            'http://localhost:3000', // Alternative Port
-            'https://tapos.work', // Your Portfolio/Production site
-        ],
-        methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-        credentials: true, // Allows cookies and Authorization headers
-        maxAge: 86400,
+    origin: [
+        'http://localhost:4000',
+        'http://localhost:3000',
+        'https://tapos.work',
+        'https://www.tapos.work',
+    ],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization'], // explicitly allow headers
     });
 
     // TODO: HELMET SECURITY

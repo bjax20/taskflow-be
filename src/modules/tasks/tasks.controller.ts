@@ -54,16 +54,27 @@ export class TasksController {
     return this.tasksService.updateStatus(projectId, taskId, req.user.userId, dto);
   }
 
-  @Delete(':taskId')
+  @Patch(':taskId')
   @UseGuards(JwtAuthGuard, ProjectAccessGuard)
-  @HttpCode(HttpStatus.NO_CONTENT) // return 204 for deletes
-  public async delete(
+  async updateTask(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('taskId', ParseIntPipe) taskId: number,
     @Request() req: AuthenticatedRequest,
+    @Body() dto: Partial<CreateTaskDto>,
   ) {
-    return this.tasksService.delete(projectId, taskId, req.user.userId);
+    return this.tasksService.update(projectId, taskId, req.user.userId, dto);
   }
+
+    @Delete(':taskId')
+    @UseGuards(JwtAuthGuard, ProjectAccessGuard)
+    @HttpCode(HttpStatus.NO_CONTENT) // return 204 for deletes
+    public async delete(
+      @Param('projectId', ParseIntPipe) projectId: number,
+      @Param('taskId', ParseIntPipe) taskId: number,
+      @Request() req: AuthenticatedRequest,
+    ) {
+      return this.tasksService.delete(projectId, taskId, req.user.userId);
+    }
 
   @Get('logs')
   @ApiOperation({ summary: 'Get activity feed for the project' })

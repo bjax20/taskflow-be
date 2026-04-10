@@ -8,29 +8,20 @@ import { UpdateTaskStatusDto } from './dto/request/update-task-status.dto';
 export class TasksService {
   public constructor(private readonly prisma: PrismaService) {}
 
-  // Added explicit return type Task to satisfy no-unsafe-return
   public async create(projectId: number, userId: number, dto: CreateTaskDto): Promise<Task> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
     });
 
-    if (!project) {
-      throw new NotFoundException(`Project with ID ${projectId} not found`);
-    }
+    if (!project) throw new NotFoundException(`Project with ID ${projectId} not found`);
 
-    // Check if the user is a member of the project
     const membership = await this.prisma.projectMember.findFirst({
-      where: {
-        projectId,
-        userId,
-      },
+      where: { projectId, userId },
     });
 
-    if (!membership) {
-      throw new ForbiddenException('You are not a member of this project');
-    }
+    if (!membership) throw new ForbiddenException('You are not a member of this project');
+
     return this.prisma.$transaction(async (tx) => {
-      // 1. Fetch names for a rich log
       const [creator, assignee] = await Promise.all([
         tx.user.findUnique({ where: { id: userId }, select: { email: true } }),
         dto.assigneeId
@@ -38,7 +29,6 @@ export class TasksService {
           : Promise.resolve(null),
       ]);
 
-      // 2. Create the Task
       const task = await tx.task.create({
         data: {
           title: dto.title,
@@ -47,31 +37,20 @@ export class TasksService {
           projectId,
           assigneeId: dto.assigneeId,
         },
-        // We include this to return the full task object
-        include: {
-          assignee: { select: { email: true } },
-        }
+        include: { assignee: { select: { email: true } } }
       });
 
-      // 3. Construct a professional audit trail
-      // Use optional chaining and fallback to handle potential nulls safely
       const creatorEmail = creator?.email ?? 'Unknown User';
       let logDetails = `Task "${task.title}" was created by ${creatorEmail}.`;
+      if (assignee?.email) logDetails += ` Assigned to ${assignee.email}.`;
 
-      if (assignee?.email) {
-        logDetails += ` Assigned to ${assignee.email}.`;
-      } else {
-        logDetails += ` Left unassigned.`;
-      }
-
-      // 4. Create the Log
       await tx.changelog.create({
         data: {
           action: 'TASK_CREATED',
           details: logDetails,
-          projectId,
-          taskId: task.id,
-          userId,
+          project: { connect: { id: projectId } }, // Fix: Use connect
+          task: { connect: { id: task.id } },    // Fix: Use connect
+          user: { connect: { id: userId } },    // Fix: Use connect
         },
       });
 
@@ -85,49 +64,109 @@ export class TasksService {
     userId: number,
     dto: UpdateTaskStatusDto,
   ): Promise<Task> {
-    // 1. Verify Project exists
-    const project = await this.prisma.project.findUnique({ where: { id: projectId } });
-    if (!project) throw new NotFoundException('Project not found');
+    const [membership, task] = await Promise.all([
+      this.prisma.projectMember.findFirst({
+        where: { projectId, userId },
+        include: { user: { select: { email: true } } }
+      }),
+      this.prisma.task.findUnique({
+        where: { id: taskId },
+        select: { id: true, projectId: true, title: true, status: true }
+      }),
+    ]);
 
-    // 2. Verify User Membership
-    const membership = await this.prisma.projectMember.findFirst({
-      where: { projectId, userId },
-    });
     if (!membership) throw new ForbiddenException('Not a project member');
-
-    // 3. Find the Task and its current status
-    const task = await this.prisma.task.findUnique({
-      where: { id: taskId },
-      include: { assignee: { select: { email: true } } },
-    });
-
     if (!task || task.projectId !== projectId) {
       throw new NotFoundException(`Task ${taskId} not found in this project`);
     }
 
-    const oldStatus = task.status;
-    const newStatus = dto.status;
-
-    // 4. Atomic Update & Log
     return this.prisma.$transaction(async (tx) => {
       const updatedTask = await tx.task.update({
         where: { id: taskId },
-        data: { status: newStatus },
+        data: { status: dto.status },
       });
-
-      const user = await tx.user.findUnique({ where: { id: userId } });
 
       await tx.changelog.create({
         data: {
           action: 'STATUS_UPDATED',
-          details: `${user?.email || 'User'} changed status from ${oldStatus} to ${newStatus} for task "${task.title}".`,
-          projectId,
-          taskId,
-          userId,
+          details: `${membership.user.email} changed status from ${task.status} to ${dto.status} for task "${task.title}".`,
+          project: { connect: { id: projectId } },
+          task: { connect: { id: taskId } },
+          user: { connect: { id: userId } },
         },
       });
 
       return updatedTask;
+    });
+  }
+
+  public async update(
+    projectId: number,
+    taskId: number,
+    userId: number,
+    dto: Partial<CreateTaskDto>,
+  ): Promise<Task> {
+    const [membership, task] = await Promise.all([
+      this.prisma.projectMember.findFirst({
+        where: { projectId, userId },
+        include: { user: { select: { email: true } } }
+      }),
+      this.prisma.task.findUnique({
+        where: { id: taskId },
+      }),
+    ]);
+
+    if (!membership) throw new ForbiddenException('Not a project member');
+    if (!task || task.projectId !== projectId) {
+      throw new NotFoundException(`Task ${taskId} not found in this project`);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const updatedTask = await tx.task.update({
+        where: { id: taskId },
+        data: {
+          title: dto.title,
+          description: dto.description,
+          assigneeId: dto.assigneeId,
+          status: dto.status as TaskStatus,
+        },
+      });
+
+      await tx.changelog.create({
+        data: {
+          action: 'TASK_UPDATED',
+          details: `${membership.user.email} updated the task details for "${task.title}".`,
+          project: { connect: { id: projectId } }, // Fix applied
+          task: { connect: { id: taskId } },    // Fix applied
+          user: { connect: { id: userId } },    // Fix applied
+        },
+      });
+
+      return updatedTask;
+    });
+  }
+
+  public async delete(projectId: number, taskId: number, userId: number): Promise<void> {
+    const [membership, task] = await Promise.all([
+      this.prisma.projectMember.findFirst({ where: { projectId, userId }, include: { user: { select: { email: true } } } }),
+      this.prisma.task.findUnique({ where: { id: taskId } })
+    ]);
+
+    if (!membership) throw new ForbiddenException('Not a project member');
+    if (!task || task.projectId !== projectId) throw new NotFoundException('Task not found');
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.task.delete({ where: { id: taskId } });
+
+      await tx.changelog.create({
+        data: {
+          action: 'TASK_DELETED',
+          details: `${membership.user.email} deleted task "${task.title}".`,
+          project: { connect: { id: projectId } },
+          user: { connect: { id: userId } },
+          // Note: We don't connect 'task' here because it was just deleted
+        },
+      });
     });
   }
   public async findAllByProject(projectId: number, userId: number): Promise<Task[]> {
@@ -163,46 +202,6 @@ export class TasksService {
       orderBy: {
         createdAt: 'desc', // Show newest tasks first
       },
-    });
-  }
-
-  public async delete(projectId: number, taskId: number, userId: number): Promise<void> {
-    // 1. Verify Project Existence
-    const project = await this.prisma.project.findUnique({ where: { id: projectId } });
-    if (!project) throw new NotFoundException('Project not found');
-
-    // 2. Verify User Membership
-    const membership = await this.prisma.projectMember.findFirst({
-      where: { projectId, userId },
-    });
-    if (!membership) throw new ForbiddenException('Not a project member');
-
-    // 3. Find the Task to get its name for the log
-    const task = await this.prisma.task.findUnique({
-      where: { id: taskId },
-    });
-
-    if (!task || task.projectId !== projectId) {
-      throw new NotFoundException(`Task ${taskId} not found in this project`);
-    }
-
-    // 4. Atomic Delete & Log
-    return this.prisma.$transaction(async (tx) => {
-      await tx.task.delete({
-        where: { id: taskId },
-      });
-
-      const user = await tx.user.findUnique({ where: { id: userId } });
-
-      await tx.changelog.create({
-        data: {
-          action: 'TASK_DELETED',
-          details: `${user?.email || 'User'} deleted task "${task.title}".`,
-          projectId,
-          taskId,
-          userId,
-        },
-      });
     });
   }
 
