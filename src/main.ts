@@ -47,6 +47,7 @@ function createSwagger(app: INestApplication) {
             },
             'access-token',
         )
+        .addServer(process.env.API_URL || 'http://localhost:3000')
         .build();
 
     const document = SwaggerModule.createDocument(app, options);
@@ -99,7 +100,11 @@ async function bootstrap(): Promise<void> {
     app.useGlobalPipes(new ValidationPipe({
         whitelist: true,
         forbidNonWhitelisted: true,
-        transform: true // Required for your findById(Number(id)) logic
+        transform: true,
+        transformOptions: {
+            enableImplicitConversion: true, // <--- CRITICAL: This turns "?page=1" (string) into 1 (number) automatically
+        },
+        // Required for your findById(Number(id)) logic
     }));
 
     // Listen on 0.0.0.0 to allow access within Docker or external networks

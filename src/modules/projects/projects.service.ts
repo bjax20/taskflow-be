@@ -103,7 +103,10 @@ export class ProjectsService {
         userId: number,
         options: { page: number; limit: number; role: string },
     ): Promise<PaginatedResponse<ProjectResponseDto>> {
-        const skip = (options.page - 1) * options.limit;
+        // these values are probably string to make sure to convert them to number
+        const limit = Number(options.limit) || 10;
+        const page = Number(options.page) || 1;
+        const skip = (page - 1) * limit;
 
         // Define the where conditions
         const whereConditions: Prisma.ProjectWhereInput =
@@ -133,8 +136,8 @@ export class ProjectsService {
                 where: whereConditions,
                 include: projectInclude,
                 orderBy: { createdAt: "desc" },
-                take: options.limit,
-                skip,
+                take: limit,
+                skip: skip,
             }),
             this.prisma.project.count({ where: whereConditions }),
         ]);
