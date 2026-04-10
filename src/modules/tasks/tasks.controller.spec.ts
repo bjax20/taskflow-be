@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { TaskStatus } from '@prisma/client';
+import { createMockTask } from '../../tests/factories/task.factory';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ProjectAccessGuard } from '../projects/guards/project-access.guard';
 import { AssigneeMembershipGuard } from './guards/assignee-membership.guard';
@@ -19,24 +19,15 @@ describe('TasksController', () => {
   let controller: TasksController;
   let service: TasksService;
 
-  const mockTaskResponse = {
-    id: 1,
-    title: 'Setup Prisma',
-    status: TaskStatus.TODO,
-    projectId: 10,
-    assigneeId: 5,
-    createdAt: new Date(),
-  };
-
+  // Single source of truth for the response structure
+  const mockTaskResponse = createMockTask({ id: 1, title: 'Setup Prisma' });
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TasksController],
       providers: [
         {
           provide: TasksService,
-          useValue: {
-            create: jest.fn().mockResolvedValue(mockTaskResponse)
-          },
+          useValue: { create: jest.fn().mockResolvedValue(mockTaskResponse) },
         },
       ],
     })

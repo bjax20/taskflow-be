@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsInt, MinLength, MaxLength } from 'class-validator';
+import { TaskStatus } from '@prisma/client';
+import { IsString, IsNotEmpty, IsOptional, IsInt, MinLength, MaxLength, IsEnum } from 'class-validator';
 
 
 export class CreateTaskDto {
@@ -29,4 +30,13 @@ export class CreateTaskDto {
   @IsInt()
   @IsOptional()
   public assigneeId?: number;
+
+  @ApiPropertyOptional({
+    enum: TaskStatus,
+    example: TaskStatus.TODO,
+    description: 'The initial status of the task'
+  })
+  @IsEnum(TaskStatus)
+  @IsOptional()
+  public status?: TaskStatus;
 }
