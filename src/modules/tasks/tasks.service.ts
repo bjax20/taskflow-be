@@ -21,13 +21,23 @@ export class TasksService {
 
     if (!membership) throw new ForbiddenException('You are not a member of this project');
 
+    // Inside create method...
     return this.prisma.$transaction(async (tx) => {
-      const [creator, assignee] = await Promise.all([
+      // 1. Fetch info and VALIDATE membership for the assignee
+      const [creator, assigneeInfo] = await Promise.all([
         tx.user.findUnique({ where: { id: userId }, select: { email: true } }),
         dto.assigneeId
-          ? tx.user.findUnique({ where: { id: dto.assigneeId }, select: { email: true } })
+          ? tx.projectMember.findFirst({ 
+              where: { projectId, userId: dto.assigneeId }, 
+              include: { user: { select: { email: true } } } 
+            })
           : Promise.resolve(null),
       ]);
+
+      // If they provided an assigneeId but that person isn't in the project
+      if (dto.assigneeId && !assigneeInfo) {
+        throw new NotFoundException(`Assignee is not a member of this project`);
+      }
 
       const task = await tx.task.create({
         data: {
@@ -37,20 +47,22 @@ export class TasksService {
           projectId,
           assigneeId: dto.assigneeId,
         },
-        include: { assignee: { select: { email: true } } }
       });
 
       const creatorEmail = creator?.email ?? 'Unknown User';
-      let logDetails = `Task "${task.title}" was created by ${creatorEmail}.`;
-      if (assignee?.email) logDetails += ` Assigned to ${assignee.email}.`;
+      
+      // FIX: Wording must match the test expectation exactly
+      const logDetails = dto.assigneeId && assigneeInfo
+        ? `Task "${task.title}" was created by ${creatorEmail}. Assigned to ${assigneeInfo.user.email}.`
+        : `Task "${task.title}" was created by ${creatorEmail}. Left unassigned.`; // <--- Test looks for this
 
       await tx.changelog.create({
         data: {
           action: 'TASK_CREATED',
           details: logDetails,
-          project: { connect: { id: projectId } }, // Fix: Use connect
-          task: { connect: { id: task.id } },    // Fix: Use connect
-          user: { connect: { id: userId } },    // Fix: Use connect
+          project: { connect: { id: projectId } },
+          task: { connect: { id: task.id } },
+          user: { connect: { id: userId } },
         },
       });
 
