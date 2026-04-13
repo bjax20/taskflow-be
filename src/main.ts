@@ -37,10 +37,9 @@ const SWAGGER_PREFIX = "/docs";
  *       code below with API keys, security requirements, tags and more.
  */
 function createSwagger(app: INestApplication) {
-    const options = new DocumentBuilder()
+    const builder = new DocumentBuilder()
         .setTitle(SWAGGER_TITLE)
         .setDescription(SWAGGER_DESCRIPTION)
-        // Explicitly name it "access-token" to match Controller
         .addBearerAuth(
             {
                 type: "http",
@@ -51,10 +50,14 @@ function createSwagger(app: INestApplication) {
                 in: "header",
             },
             "access-token",
-        )
-        .addServer(process.env.API_URL || "http://localhost:3000")
-        .build();
+        );
 
+    // Only add the server if API_URL is explicitly provided in .env
+    if (process.env.API_URL) {
+        builder.addServer(process.env.API_URL);
+    }
+
+    const options = builder.build();
     const document = SwaggerModule.createDocument(app, options);
     SwaggerModule.setup(SWAGGER_PREFIX, app, document);
 }
@@ -115,7 +118,7 @@ async function bootstrap(): Promise<void> {
             // Required for your findById(Number(id)) logic
         }),
     );
-    
+
     // @ts-expect-error - version mismatch between @fastify/cookie and NestJS Fastify adapter types
     await app.register(fastifyCookie, {
         secret: process.env.JWT_SECRET,
