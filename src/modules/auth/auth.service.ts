@@ -45,4 +45,15 @@ export class AuthService {
             access_token: await this.jwtService.signAsync(payload),
         };
     }
+
+    /**
+     * Logic for logging out.
+     * Since we use stateless JWTs with cookies, the service mainly
+     * returns a success signal. In the future, you could add
+     * token blacklisting here (e.g., using Redis).
+     */
+    public logout(): { success: boolean } {
+        //  add logic here to invalidate sessions in a DB/Redis if needed.
+        return { success: true };
+    }
 }

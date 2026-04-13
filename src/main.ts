@@ -1,16 +1,21 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { AppModule } from './modules/app.module';
-import { CommonModule, LogInterceptor } from './modules/common';
+import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { NestFactory } from "@nestjs/core";
+import {
+    FastifyAdapter,
+    NestFastifyApplication,
+} from "@nestjs/platform-fastify";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { AppModule } from "./modules/app.module";
+import { CommonModule, LogInterceptor } from "./modules/common";
+import * as fastifyCookie from "@fastify/cookie";
 
 /**
  * These are API defaults that can be changed using environment variables,
  * it is not required to change them (see the `.env.example` file)
  */
 const API_DEFAULT_PORT = 3000;
-const API_DEFAULT_PREFIX = '/api/v1';
+const API_DEFAULT_PREFIX = "/api/v1";
 
 /**
  * The defaults below are dedicated to Swagger configuration, change them
@@ -18,9 +23,9 @@ const API_DEFAULT_PREFIX = '/api/v1';
  *
  * @todo Change the constants below following your API requirements
  */
-const SWAGGER_TITLE = 'Tapos API';
-const SWAGGER_DESCRIPTION = 'API used for tapos';
-const SWAGGER_PREFIX = '/docs';
+const SWAGGER_TITLE = "Tapos API";
+const SWAGGER_DESCRIPTION = "API used for tapos";
+const SWAGGER_PREFIX = "/docs";
 
 /**
  * Register a Swagger module in the NestJS application.
@@ -38,16 +43,16 @@ function createSwagger(app: INestApplication) {
         // Explicitly name it "access-token" to match Controller
         .addBearerAuth(
             {
-                type: 'http',
-                scheme: 'bearer',
-                bearerFormat: 'JWT',
-                name: 'JWT',
-                description: 'Enter JWT token',
-                in: 'header',
+                type: "http",
+                scheme: "bearer",
+                bearerFormat: "JWT",
+                name: "JWT",
+                description: "Enter JWT token",
+                in: "header",
             },
-            'access-token',
+            "access-token",
         )
-        .addServer(process.env.API_URL || 'http://localhost:3000')
+        .addServer(process.env.API_URL || "http://localhost:3000")
         .build();
 
     const document = SwaggerModule.createDocument(app, options);
@@ -63,21 +68,21 @@ function createSwagger(app: INestApplication) {
 async function bootstrap(): Promise<void> {
     const app = await NestFactory.create<NestFastifyApplication>(
         AppModule,
-        new FastifyAdapter()
+        new FastifyAdapter(),
     );
 
     // ADD CORS CONFIGURATION
     // This allows your React/Next.js frontend to talk to your Fastify backend
     app.enableCors({
-    origin: [
-        'http://localhost:4000',
-        'http://localhost:3000',
-        'https://tapos.work',
-        'https://www.tapos.work',
-    ],
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization'], // explicitly allow headers
+        origin: [
+            "http://localhost:4000",
+            "http://localhost:3000",
+            "https://tapos.work",
+            "https://www.tapos.work",
+        ],
+        methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
+        credentials: true,
+        allowedHeaders: ["Content-Type", "Authorization"], // explicitly allow headers
     });
 
     // TODO: HELMET SECURITY
@@ -90,7 +95,7 @@ async function bootstrap(): Promise<void> {
 
     app.setGlobalPrefix(process.env.API_PREFIX || API_DEFAULT_PREFIX);
 
-    if (!process.env.SWAGGER_ENABLE || process.env.SWAGGER_ENABLE === '1') {
+    if (!process.env.SWAGGER_ENABLE || process.env.SWAGGER_ENABLE === "1") {
         createSwagger(app);
     }
 
@@ -99,21 +104,38 @@ async function bootstrap(): Promise<void> {
 
     // ENHANCED VALIDATION PIPE
     // Adding 'transform: true' ensures your string IDs from params become numbers
-    app.useGlobalPipes(new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-        transformOptions: {
-            enableImplicitConversion: true, // <--- CRITICAL: This turns "?page=1" (string) into 1 (number) automatically
-        },
-        // Required for your findById(Number(id)) logic
-    }));
+    app.useGlobalPipes(
+        new ValidationPipe({
+            whitelist: true,
+            forbidNonWhitelisted: true,
+            transform: true,
+            transformOptions: {
+                enableImplicitConversion: true, // <--- CRITICAL: This turns "?page=1" (string) into 1 (number) automatically
+            },
+            // Required for your findById(Number(id)) logic
+        }),
+    );
+
+    // @ts-expect-error - version mismatch between @fastify/cookie and NestJS Fastify adapter types
+    await app.register(fastifyCookie, {
+        secret: process.env.JWT_SECRET,
+    });
 
     // Listen on 0.0.0.0 to allow access within Docker or external networks
     const port = process.env.API_PORT || API_DEFAULT_PORT;
-    await app.listen(port, '0.0.0.0');
-    console.log(`🚀 Application is running on: http://localhost:${port}${API_DEFAULT_PREFIX}`);
-    console.log(`📝 Swagger docs available at: http://localhost:${port}${SWAGGER_PREFIX}`);
+    await app.listen(port, "0.0.0.0");
+    console.log(
+        `🚀 Application is running on: http://localhost:${port}${API_DEFAULT_PREFIX}`,
+    );
+    console.log(
+        `📝 Swagger docs available at: http://localhost:${port}${SWAGGER_PREFIX}`,
+    );
+    const env = process.env.NODE_ENV || "development";
+    console.log(`--- 🔌 SYSTEM STATUS: Running in [${env}] mode ---`);
+
+    const configService = app.get(ConfigService);
+    console.log("Current Port:", configService.get("API_PORT"));
+    console.log("Current Env:", configService.get("NODE_ENV"));
 }
 
 /**
@@ -124,8 +146,7 @@ async function bootstrap(): Promise<void> {
  * @todo It is often advised to enhance the code below with an exception-catching
  *       service for better error handling in production environments.
  */
-bootstrap().catch(err => {
-
+bootstrap().catch((err) => {
     // eslint-disable-next-line no-console
     console.error(err);
 
