@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 
-import { PrismaClient, Prisma } from "../generated/client";
+import { PrismaClient, Prisma } from '@prisma/client';
 
 // Define options with explicit types to help the compiler
 const prismaOptions: Prisma.PrismaClientOptions = {

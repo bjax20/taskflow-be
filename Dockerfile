@@ -1,59 +1,55 @@
-# Build a "virtual laptop" and call it "builder"
+# Stage 1: Build
 FROM node:20.19.0-alpine AS builder
 
-# Install openssl for Prisma (Required for Alpine)
-RUN apk add --no-cache openssl
+# 1. Install system dependencies (Prisma needs openssl and libc6-compat on Alpine)
+RUN apk add --no-cache openssl libc6-compat
+
+# 2. Setup pnpm
+RUN npm install -g pnpm
 
 WORKDIR /usr/src/app
 
-# Copy configuration files
-COPY package*.json ./
-
-# Ensure Prisma Schema is there before installation
+# 3. Copy dependency files first for better layer caching
+COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma/
 
-# Install ALL dependencies
-RUN npm ci
+# 4. Strict install
+RUN pnpm install --frozen-lockfile
 
-# Copy source code
+# 5. Copy source and generate Prisma Client inside node_modules
 COPY . .
 
-# Ensure we use the correct binary for Alpine
+# Match the binary target to the Alpine runtime
 ENV PRISMA_CLI_BINARY_TARGETS=linux-musl-openssl-3.0.x
+RUN pnpm exec prisma generate
 
-# 1. Generate the client into src/generated/client
-RUN npx prisma generate
+# 6. Build the NestJS application
+RUN pnpm run build
 
-# 2. Build the NestJS app (it will now include the generated client in /dist)
-RUN npm run build
-
-# Remove dev dependencies
-RUN npm prune --omit=dev
+# 7. Remove devDependencies (Prisma client stays because it's in dependencies)
+RUN pnpm prune --prod
 
 # ============================================
-# RUNTIME STAGE
+# Stage 2: Runtime
 # ============================================
 FROM node:20.19.0-alpine
 
+# Install runtime requirements
 RUN apk add --no-cache openssl curl
 
 WORKDIR /usr/src/app
 
-# Copy node_modules (production only)
+# 8. Copy production node_modules (this now contains the generated Prisma client)
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 
-# 3. CRITICAL: Copy the generated client folder 
-# Even though it's built into /dist, the runtime code still looks for 
-# the source paths if you used relative imports.
-COPY --from=builder /usr/src/app/src/generated ./src/generated
-
-# Copy the compiled code
+# 9. Copy compiled code and metadata
 COPY --from=builder /usr/src/app/dist ./dist
-COPY --from=builder /usr/src/app/prisma ./prisma
-COPY --from=builder /usr/src/app/package*.json ./
+COPY --from=builder /usr/src/app/package.json ./
+
+# Optional: Set user to 'node' for security
+# USER node
 
 ENV NODE_ENV=production
-
 EXPOSE 3000
 
 CMD ["node", "dist/src/main.js"]

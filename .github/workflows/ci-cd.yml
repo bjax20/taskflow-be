@@ -45,7 +45,7 @@ jobs:
           DATABASE_URL: mysql://root:test_root_password@localhost:3306/tapos_test
 
       - name: Run Tests (TDD Strict)
-        run: npx jest --config jest.config.js
+        run: npx jest --config jest.config.ts
         env:
           NODE_ENV: test
           DATABASE_URL: mysql://root:test_root_password@localhost:3306/tapos_test
