@@ -24,7 +24,7 @@
     "test:cov": "jest --coverage",
     "test:all": "npm run lint && npm run test && npm run build",
     "test:int": "npx prisma generate && cross-env NODE_ENV=test jest --config src/tests/jest-int.json --rootDir .",
-    "test:e2e": "cross-env NODE_ENV=test npm run db:test:create && npm run test:migrate && dotenv -e .env.test -- jest --config src/tests/jest-e2e.json --rootDir .",
+   "test:e2e": "cross-env NODE_ENV=test npm run db:test:create && npm run test:migrate && cross-env NODE_ENV=test dotenv -e .env.test -- npx prisma generate && cross-env NODE_ENV=test dotenv -e .env.test -- jest --config src/tests/jest-e2e.json --rootDir .",
     "test:e2e:watch": "cross-env NODE_ENV=test dotenv -e .env.test -- jest --config src/tests/jest-e2e.json --rootDir . --watch",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "migrate:dev": "npx prisma migrate dev",

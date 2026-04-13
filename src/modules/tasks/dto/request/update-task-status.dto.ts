@@ -1,9 +1,8 @@
-import { TaskStatus } from '@prisma/client';
-import { IsEnum, IsNotEmpty } from 'class-validator';
-
+import { TaskStatus } from "../../../../generated/client";
+import { IsEnum, IsNotEmpty } from "class-validator";
 
 export class UpdateTaskStatusDto {
-  @IsEnum(TaskStatus)
-  @IsNotEmpty()
-  public status!: TaskStatus;
+    @IsEnum(TaskStatus)
+    @IsNotEmpty()
+    public status!: TaskStatus;
 }

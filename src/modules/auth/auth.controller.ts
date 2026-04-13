@@ -43,6 +43,7 @@ export class AuthController {
     }
 
     @Post("login")
+    @HttpCode(200)
     public async login(
         @Body() loginDto: LoginDto,
         @Res({ passthrough: true }) response: FastifyReply,
