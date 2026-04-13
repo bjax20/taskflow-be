@@ -11,28 +11,41 @@ import { UpdateTaskStatusDto } from "./dto/request/update-task-status.dto";
 
 @Injectable()
 export class TasksService {
-
     public constructor(private readonly prisma: PrismaService) {}
 
     async create(projectId: number, userId: number, dto: CreateTaskDto) {
         return this.prisma.$transaction(async (tx) => {
-            // 1. Auth check
+            // 1. Auth check (Creator)
             const membership = await tx.projectMember.findFirst({
                 where: { projectId, userId },
             });
             if (!membership) throw new ForbiddenException();
 
-            // 2. Find the highest position in the target status column
+           
+            let assigneeEmail = "";
+            if (dto.assigneeId) {
+                const assigneeMember = await tx.projectMember.findFirst({
+                    where: { projectId, userId: dto.assigneeId },
+                    include: { user: { select: { email: true } } },
+                });
+                if (!assigneeMember) {
+                    throw new NotFoundException(
+                        "Assignee is not a member of this project",
+                    );
+                }
+                assigneeEmail = assigneeMember.user.email;
+            }
+
+            // 2. Find position
             const lastTask = await tx.task.findFirst({
                 where: { projectId, status: dto.status },
                 orderBy: { position: "desc" },
                 select: { position: true },
             });
 
-            // 3. Set position (default to 1000 if column is empty)
             const position = lastTask ? lastTask.position + 1000 : 1000;
 
-            // 4. Create task
+            // 3. Create task
             const task = await tx.task.create({
                 data: {
                     ...dto,
@@ -41,11 +54,15 @@ export class TasksService {
                 },
             });
 
-            // 5. Log it
+            // 4. Enhanced Logging
+            const assignmentDetail = dto.assigneeId
+                ? `Assigned to ${assigneeEmail}`
+                : "Left unassigned";
+
             await tx.changelog.create({
                 data: {
                     action: "TASK_CREATED",
-                    details: `Created task "${task.title}"`,
+                    details: `Created task "${task.title}". ${assignmentDetail}`,
                     projectId,
                     taskId: task.id,
                     userId,
@@ -190,7 +207,8 @@ export class TasksService {
 
             const oldStatus = task.status;
             const newStatus = dto.status ?? oldStatus;
-            const newPos = dto.position !== undefined ? dto.position : task.position;
+            const newPos =
+                dto.position !== undefined ? dto.position : task.position;
 
             // 2. Update the task
             const updatedTask = await tx.task.update({
