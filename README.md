@@ -31,7 +31,7 @@ pnpm run db:setup
 pnpm run start:dev
 ```
 * **API Entry:** `http://localhost:3000/api/v1`
-* **Interactive Documentation:** `/api/v1/docs` (Swagger/OpenAPI)
+* **Interactive Documentation:** `/docs` (Swagger/OpenAPI)
 
 ---
 
@@ -64,12 +64,13 @@ This repository is built for **Continuous Integration**. On every pull request o
 ## 🚧 Status & Maintenance
 
 ### Known Issues & Incomplete Functionality
-The following areas are currently under development or identified for future optimization:
+The following areas are currently under development or identified for future optimization to meet full production standards:
 
-* **[SLOT: FEATURE/BUG NAME]** — *e.g., Real-time notification socket integration is currently in the architectural phase.*
-* **[SLOT: FEATURE/BUG NAME]** — *e.g., Rate limiting is partially implemented; currently evaluating Redis-based global throttling.*
-* **[SLOT: FEATURE/BUG NAME]** — *e.g., Password recovery flow requires an SMTP provider configuration.*
-
+* **Session Persistence** — *The system currently utilizes a single-tier stateless JWT with a 1-hour expiration; a full Refresh Token rotation strategy is earmarked for future implementation.*
+* **Real-time Collaboration** — *Project updates currently rely on standard request-response cycles; WebSocket integration for live task synchronization is currently in the architectural phase.*
+* **User Profile Management** — *The "Me" endpoint is functional for auth verification, but the UI and backend logic for updating user profiles and account details are currently placeholders.*
+* **Advanced Invitation Logic** — *Project collaboration currently uses a direct-add approach for existing platform users
+* **Email Verification** — *Account registration uses basic format validation; a strict double-opt-in email verification process is currently out of scope.*
 ---
 
 ## 📜 Technical Utility Scripts
