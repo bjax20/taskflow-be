@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { TaskStatus } from "../../../../generated/client";
+import { TaskStatus } from '@prisma/client';
 import { IsEnum, IsNumber, IsOptional, Min } from "class-validator";
 
 export class MoveTaskDto {

@@ -4,20 +4,25 @@ module.exports = {
     roots: ["<rootDir>/src"],
     testMatch: ["**/__tests__/**/*.ts", "**/?(*.)+(spec|test).ts"],
     moduleFileExtensions: ["ts", "js", "json"],
-    
+
+    // moduleNameMapper: {
+    //     "^@prisma/client$": "<rootDir>/src/generated/client"
+    // },
+
     moduleNameMapper: {
-        "^@prisma/client$": "<rootDir>/src/generated/client"
+        "^@prisma/client$": "<rootDir>/../../node_modules/@prisma/client",
+        "^src/(.*)$": "<rootDir>/../../src/$1",
     },
-    
+
     // CRITICAL: Run tests sequentially to prevent database conflicts
     maxWorkers: 1,
-    
+
     // Setup files
     setupFilesAfterEnv: ["<rootDir>/src/tests/setup.ts"],
-    
+
     // Timeouts
     testTimeout: 30000,
-    
+
     // Transform
     transform: {
         "^.+\\.tsx?$": [
@@ -30,13 +35,13 @@ module.exports = {
             },
         ],
     },
-    
+
     // Bail on first failure (helps identify cascade failures)
     bail: false,
-    
+
     // Verbose output
     verbose: true,
-    
+
     // Coverage
     collectCoverageFrom: [
         "src/**/*.ts",
