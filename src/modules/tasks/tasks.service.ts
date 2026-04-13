@@ -13,15 +13,14 @@ import { UpdateTaskStatusDto } from "./dto/request/update-task-status.dto";
 export class TasksService {
     public constructor(private readonly prisma: PrismaService) {}
 
-    async create(projectId: number, userId: number, dto: CreateTaskDto) {
+    public async create(projectId: number, userId: number, dto: CreateTaskDto) {
         return this.prisma.$transaction(async (tx) => {
-            // 1. Auth check (Creator)
             const membership = await tx.projectMember.findFirst({
                 where: { projectId, userId },
             });
             if (!membership) throw new ForbiddenException();
 
-           
+
             let assigneeEmail = "";
             if (dto.assigneeId) {
                 const assigneeMember = await tx.projectMember.findFirst({
@@ -36,7 +35,7 @@ export class TasksService {
                 assigneeEmail = assigneeMember.user.email;
             }
 
-            // 2. Find position
+            // Find position
             const lastTask = await tx.task.findFirst({
                 where: { projectId, status: dto.status },
                 orderBy: { position: "desc" },
@@ -45,7 +44,7 @@ export class TasksService {
 
             const position = lastTask ? lastTask.position + 1000 : 1000;
 
-            // 3. Create task
+            // Create task
             const task = await tx.task.create({
                 data: {
                     ...dto,
@@ -54,7 +53,7 @@ export class TasksService {
                 },
             });
 
-            // 4. Enhanced Logging
+            // Enhanced Logging
             const assignmentDetail = dto.assigneeId
                 ? `Assigned to ${assigneeEmail}`
                 : "Left unassigned";
@@ -195,7 +194,7 @@ export class TasksService {
         dto: MoveTaskDto,
     ) {
         return this.prisma.$transaction(async (tx) => {
-            // 1. Basic validation
+            // Basic validation
             const [membership, task] = await Promise.all([
                 tx.projectMember.findFirst({ where: { projectId, userId } }),
                 tx.task.findUnique({ where: { id: taskId } }),
@@ -203,14 +202,14 @@ export class TasksService {
 
             if (!membership) throw new ForbiddenException("Not a member");
             if (!task || task.projectId !== projectId)
-                throw new NotFoundException("Task not found");
+                {throw new NotFoundException("Task not found");}
 
             const oldStatus = task.status;
             const newStatus = dto.status ?? oldStatus;
             const newPos =
                 dto.position !== undefined ? dto.position : task.position;
 
-            // 2. Update the task
+            // Update the task
             const updatedTask = await tx.task.update({
                 where: { id: taskId },
                 data: {
@@ -219,7 +218,7 @@ export class TasksService {
                 },
             });
 
-            // 3. Simple Log
+            // Simple Log
             if (oldStatus !== newStatus) {
                 await tx.changelog.create({
                     data: {

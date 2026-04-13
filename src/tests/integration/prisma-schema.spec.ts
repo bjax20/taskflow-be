@@ -40,10 +40,10 @@ describe("Prisma Schema Constraints (Integration)", () => {
     });
 
     it("should only allow valid TaskStatus enums", async (): Promise<void> => {
-        // ✅ Use Factory to generate valid owner data for the nested create
+        // Use Factory to generate valid owner data for the nested create
         const ownerData = createRegisterDto();
 
-        // 1. Atomic Create: Project and Owner in one transaction
+        // Atomic Create: Project and Owner in one transaction
         const projectWithUser = await prisma.project.create({
             data: {
                 title: "Enum Test Project",
@@ -57,7 +57,7 @@ describe("Prisma Schema Constraints (Integration)", () => {
             },
         });
 
-        // 2. Test Valid Enum
+        // Test Valid Enum
         const task = await prisma.task.create({
             data: {
                 title: "Valid Task",
@@ -68,7 +68,7 @@ describe("Prisma Schema Constraints (Integration)", () => {
 
         expect(task.status).toBe("TODO");
 
-        // 3. Test Invalid Enum
+        // Test Invalid Enum
         await expect(
             prisma.task.create({
                 data: {

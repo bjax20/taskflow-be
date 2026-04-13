@@ -1,3 +1,4 @@
+import * as fastifyCookie from "@fastify/cookie";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
@@ -8,7 +9,6 @@ import {
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./modules/app.module";
 import { CommonModule, LogInterceptor } from "./modules/common";
-import * as fastifyCookie from "@fastify/cookie";
 
 /**
  * These are API defaults that can be changed using environment variables,
@@ -75,7 +75,6 @@ async function bootstrap(): Promise<void> {
     );
 
     // ADD CORS CONFIGURATION
-    // This allows your React/Next.js frontend to talk to your Fastify backend
     app.enableCors({
         origin: [
             "http://localhost:4000",
@@ -106,7 +105,6 @@ async function bootstrap(): Promise<void> {
     app.useGlobalInterceptors(logInterceptor);
 
     // ENHANCED VALIDATION PIPE
-    // Adding 'transform: true' ensures your string IDs from params become numbers
     app.useGlobalPipes(
         new ValidationPipe({
             whitelist: true,
@@ -115,7 +113,6 @@ async function bootstrap(): Promise<void> {
             transformOptions: {
                 enableImplicitConversion: true, // <--- CRITICAL: This turns "?page=1" (string) into 1 (number) automatically
             },
-            // Required for your findById(Number(id)) logic
         }),
     );
 

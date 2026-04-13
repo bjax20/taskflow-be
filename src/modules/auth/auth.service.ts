@@ -13,7 +13,6 @@ export class AuthService {
     ) {}
 
     public async register(dto: RegisterDto) {
-        // Extract only what you need to transform (password)
         const { password, ...userData } = dto;
         const hashedPassword = await bcrypt.hash(password, 10);
 

@@ -1,3 +1,4 @@
+import fastifyCookie from "@fastify/cookie";
 import { ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
@@ -10,7 +11,6 @@ import request from "supertest";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { AppModule } from "../../modules/app.module";
 import { createRegisterDto } from "../../tests/factories/auth.factory";
-import fastifyCookie from "@fastify/cookie";
 
 describe("Project System (Integration)", () => {
     let app: NestFastifyApplication;
@@ -29,7 +29,11 @@ describe("Project System (Integration)", () => {
             new FastifyAdapter(),
         );
         const fastifyInstance = app.getHttpAdapter().getInstance();
-        await fastifyInstance.register(fastifyCookie as any);
+        await fastifyInstance.register(
+            fastifyCookie as unknown as Parameters<
+                typeof fastifyInstance.register
+            >[0],
+        );
         configService = moduleFixture.get<ConfigService>(ConfigService);
         PREFIX = configService.get<string>("API_PREFIX", "/api/v1");
 

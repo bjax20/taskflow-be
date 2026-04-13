@@ -22,7 +22,7 @@ describe("Project Logic Flow", () => {
             email: `dev-${Date.now()}@billdev.online`,
         });
 
-        // 1. Create the User first
+        // Create the User first
         const user = await prisma.user.create({
             data: {
                 email: userData.email,
@@ -33,7 +33,7 @@ describe("Project Logic Flow", () => {
 
         expect(user.id).toBeDefined();
 
-        // 2. Create Project Alpha
+        // Create Project Alpha
         const projectAlpha = await prisma.project.create({
             data: {
                 title: "Project Alpha",
@@ -43,7 +43,7 @@ describe("Project Logic Flow", () => {
 
         expect(projectAlpha.id).toBeDefined();
 
-        // 3. Create Project Beta
+        // Create Project Beta
         const projectBeta = await prisma.project.create({
             data: {
                 title: "Project Beta",
@@ -53,13 +53,13 @@ describe("Project Logic Flow", () => {
 
         expect(projectBeta.id).toBeDefined();
 
-        // 4. Verify projects exist
+        // Verify projects exist
         const projectAlphaCheck = await prisma.project.findUnique({
             where: { id: projectAlpha.id },
         });
         expect(projectAlphaCheck).toBeDefined();
 
-        // 5. Add memberships
+        // Add memberships
         // No manual mapping needed for IDs
         await prisma.projectMember.create({
             data: {
@@ -75,7 +75,7 @@ describe("Project Logic Flow", () => {
             },
         });
 
-        // 6. Query and verify with includes
+        // Query and verify with includes
         const userWithMemberships = await prisma.user.findUnique({
             where: { id: user.id },
             include: {
@@ -84,7 +84,7 @@ describe("Project Logic Flow", () => {
             },
         });
 
-        // 7. Assertions
+        // Assertions
         expect(userWithMemberships).toBeDefined();
         // User should be a member of 2 projects and own 2 projects
         expect(userWithMemberships?.projects).toHaveLength(2);

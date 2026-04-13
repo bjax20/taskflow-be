@@ -4,8 +4,8 @@ import { PrismaModule } from "../../prisma/prisma.module";
 import { AuthModule } from "./auth/auth.module";
 import { CommonModule } from "./common/common.module";
 import { ProjectsModule } from "./projects/projects.module";
+import { SeedModule } from "./seed/seed.module";
 import { TasksModule } from "./tasks/tasks.module";
-
 
 @Module({
     imports: [
@@ -18,6 +18,7 @@ import { TasksModule } from "./tasks/tasks.module";
         AuthModule,
         ProjectsModule,
         TasksModule,
+        SeedModule,
     ],
     controllers: [],
     providers: [],

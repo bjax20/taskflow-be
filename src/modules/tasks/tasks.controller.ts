@@ -16,10 +16,10 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { ProjectAccessGuard } from "../projects/guards/project-access.guard";
 import { CreateTaskDto } from "./dto/request/create-task.dto";
-import { AssigneeMembershipGuard } from "./guards/assignee-membership.guard";
-import { TasksService } from "./tasks.service";
 import { MoveTaskDto } from "./dto/request/move-task.dto";
 import { UpdateTaskStatusDto } from "./dto/request/update-task-status.dto";
+import { AssigneeMembershipGuard } from "./guards/assignee-membership.guard";
+import { TasksService } from "./tasks.service";
 
 // TODO: Define the shape of Request with User attached
 interface AuthenticatedRequest extends Request {

@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('--- Starting Seed ---');
 
-  // 1. Upsert User (Prevents duplicate email error)
+  // Upsert User (Prevents duplicate email error)
   const user = await prisma.user.upsert({
     where: { email: 'test@example.com' },
     update: {},
@@ -15,7 +15,7 @@ async function main() {
     },
   });
 
-  // 2. Upsert Project
+  // Upsert Project
   // We use the title as a unique check for the seed, or find by owner + title
   const projectTitle = 'Onboarding Project';
 
@@ -32,13 +32,13 @@ async function main() {
         title: projectTitle,
         description: 'My first project created via seed',
         ownerId: user.id,
-        // 3. Add the owner as a member automatically
+        // Add the owner as a member automatically
         members: {
           create: {
             userId: user.id,
           },
         },
-        // 4. Create initial tasks
+        // Create initial tasks
         tasks: {
           create: [
             {
@@ -61,7 +61,7 @@ async function main() {
     console.log(`Project "${project.title}" already exists, skipping create.`);
   }
 
-  // 5. Create a Log entry for the seed action
+  // Create a Log entry for the seed action
   await prisma.changelog.create({
     data: {
       action: 'SYSTEM_SEED',
