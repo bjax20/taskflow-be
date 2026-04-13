@@ -167,6 +167,6 @@ jobs:
             echo "✅ API is healthy!"
 
             echo "=== 🔄 STEP 5: Database Migrations ==="
-            docker-compose -p tapos exec -T api ./node_modules/.bin/prisma migrate deploy
+            docker-compose -p tapos exec -T api npx prisma migrate deploy
 
             echo "=== 🎉 ✅ DEPLOYMENT SUCCESSFUL ==="
