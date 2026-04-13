@@ -1,14 +1,13 @@
 import { Test, TestingModule } from "@nestjs/testing";
+import { TaskStatus } from "@prisma/client";
 import { createMockTask } from "../../tests/factories/task.factory";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { ProjectAccessGuard } from "../projects/guards/project-access.guard";
+import { MoveTaskDto } from "./dto/request/move-task.dto";
 import { AssigneeMembershipGuard } from "./guards/assignee-membership.guard";
 import { TasksController } from "./tasks.controller";
 import { TasksService } from "./tasks.service";
-import { TaskStatus } from "@prisma/client";
-import { MoveTaskDto } from "./dto/request/move-task.dto";
 
-// Using the same interface defined in your controller for consistency
 export interface AuthenticatedRequest extends Request {
     user: {
         userId: number;

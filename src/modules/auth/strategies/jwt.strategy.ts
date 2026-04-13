@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PassportStrategy } from "@nestjs/passport";
-import { FastifyRequest } from "fastify"; 
+import { FastifyRequest } from "fastify";
 import { ExtractJwt, Strategy } from "passport-jwt";
 
 
@@ -27,7 +27,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
     }
 
     public validate(payload: JwtPayload) {
-        // Keeps your RequestWithUser interface happy
+
         return { userId: Number(payload.sub), email: payload.email };
     }
 }

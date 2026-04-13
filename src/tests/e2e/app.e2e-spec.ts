@@ -11,27 +11,26 @@ describe('AppController (e2e)', () => {
       imports: [AppModule],
     }).compile();
 
-    // 1. Create FastifyAdapter with proper configuration
+    // Create FastifyAdapter with proper configuration
     const fastifyAdapter = new FastifyAdapter();
 
-    // 2. Initialize with Fastify
+    // Initialize with Fastify
     app = moduleFixture.createNestApplication<NestFastifyApplication>(
       fastifyAdapter,
     );
 
-    // 3. Set the Global Prefix BEFORE init
+    // Set the Global Prefix BEFORE init
     app.setGlobalPrefix('api/v1');
 
-    // 4. Initialize the app
+    // Initialize the app
     await app.init();
 
-    // 5. Wait for Fastify to be ready (CRITICAL for Fastify)
+    // Wait for Fastify to be ready (CRITICAL for Fastify)
     await app.getHttpAdapter().getInstance().ready();
   });
 
  it('/api/v1/health (GET) - Health Check', async () => request(app.getHttpServer())
     .get('/api/v1/health')
-    // Use the value from your .env.test
     .set('x-health-token', process.env.HEALTH_TOKEN || 'devhealth')
     .expect(200));
 

@@ -65,7 +65,7 @@ export class ProjectsService {
     createProjectDto: CreateProjectDto,
     userId: number,
 ): Promise<ProjectDetailResponseDto> {
-    // 1. Check if project with same title already exists for this user
+    // Check if project with same title already exists for this user
     const existingProject = await this.prisma.project.findFirst({
         where: {
             title: createProjectDto.title,
@@ -77,7 +77,7 @@ export class ProjectsService {
         throw new ConflictException("You already have a project with this title");
     }
 
-    // 2. The Fix: Add the 'members' nested create
+    // The Fix: Add the 'members' nested create
     const project = await this.prisma.project.create({
         data: {
             title: createProjectDto.title,
@@ -142,7 +142,6 @@ export class ProjectsService {
             this.prisma.project.count({ where: whereConditions }),
         ]);
 
-        // Map the results to your DTO
         const data = projects.map((project: ProjectWithRelations): ProjectResponseDto => ({
             id: project.id,
             title: project.title,

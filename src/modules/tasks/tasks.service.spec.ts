@@ -2,8 +2,8 @@ import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { TaskStatus } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
-import { TasksService } from "./tasks.service";
 import { MoveTaskDto } from "./dto/request/move-task.dto";
+import { TasksService } from "./tasks.service";
 
 describe("TasksService", () => {
     let service: TasksService;
@@ -35,7 +35,6 @@ describe("TasksService", () => {
         createdAt: new Date(),
     };
 
-    // 1. Keep your interface as is
     interface MockPrismaClient {
         user: { findUnique: jest.Mock };
         project: { findUnique: jest.Mock };
@@ -164,14 +163,12 @@ describe("TasksService", () => {
             mockPrismaClient.user.findUnique.mockResolvedValue(mockUser);
             mockPrismaClient.task.findFirst.mockResolvedValue(null); // No existing tasks
 
-            const dto = { title: "Solo Task", assigneeId: undefined};
+            const dto = { title: "Solo Task", assigneeId: undefined };
             await service.create(10, 1, dto);
 
             expect(mockPrismaClient.changelog.create).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: expect.objectContaining({
-                        // If this still fails, check your TasksService.create logic
-                        // to ensure it appends "Left unassigned" to the details string.
                         details: expect.stringContaining("Left unassigned"),
                     }),
                 }),
@@ -232,11 +229,8 @@ describe("TasksService", () => {
             // Act
             const result = await service.move(10, 101, 1, dto);
 
-            // Assert
-            // 1. Verify we ARE NOT calling updateMany anymore (Strategy A)
             expect(mockPrismaClient.task.updateMany).not.toHaveBeenCalled();
 
-            // 2. Verify the single task update with the exact values from the DTO
             expect(mockPrismaClient.task.update).toHaveBeenCalledWith({
                 where: { id: 101 },
                 data: {
