@@ -1,14 +1,9 @@
-import { Request } from 'express';
+import { FastifyRequest } from 'fastify';
 
-/**
- * Interface representing the Express Request object
- * augmented with the user data from JwtStrategy.
- */
-export interface RequestWithUser extends Request {
+export interface RequestWithUser extends FastifyRequest {
   user: {
     userId: string;
     email: string;
     fullName: string;
-    // Add other fields if JWT strategy returns them (e.g., name, role)
   };
 }
