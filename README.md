@@ -1,75 +1,86 @@
+# Tapos.work | Project Management Backend
 
+A robust, enterprise-grade NestJS API designed for team collaboration. This system is architected with a focus on **Type Safety**, **Automated Orchestration**, and **CI/CD**.
 
-#  Getting Started
-
-Follow these steps to set up the development environment on your local machine.
-
-## 1. Prerequisites
-Ensure you have the following installed:
-* **Docker & Docker Desktop** (Required for the MySQL database)
-* **Node.js** (v18 or higher)
-* **npm** (v9 or higher)
+## 🏗 Key Architectural Pillars
+* **NestJS (Fastify):** High-performance, low-overhead framework for scalable I/O.
+* **Prisma ORM:** Strictly typed database interactions with a centralized schema.
+* **Dockerized Infrastructure:** Containerized MySQL environment for consistent local and production parity.
+* **Professional Test Suite:** Full coverage using **Jest** with a clear separation between unit, integration, and E2E layers.
 
 ---
 
-## 2. Environment Configuration
-1. Clone the repository.
-2. Create a `.env` file in the root directory:
-   ```bash
-   cp .env.example .env
-   ```
-3. Open `.env` and verify the `DATABASE_URL` matches your local Docker settings:
-   `DATABASE_URL="mysql://dev_user:dev_password@localhost:3306/tapos_db"`
+## 🛠 Quick Start (The "One-Command" Setup)
 
----
+I've optimized the onboarding process to ensure you can go from `git clone` to a fully functional, seeded environment in under two minutes.
 
-## 3. Infrastructure Setup (Docker)
-Fire up the database container. This runs in the background.
+### 1. Environment & Infrastructure
 ```bash
-docker-compose up -d db
+cp .env.example .env
+docker-compose up -d tapos_db
 ```
 
-> **Note for First-Time Setup:** If you encounter a `P3014` error regarding permissions, run the following to grant the dev user "Architect" privileges:
-> `docker exec -it tapos_db mysql -u root -prootpassword -e "GRANT ALL PRIVILEGES ON *.* TO 'dev_user'@'%'; FLUSH PRIVILEGES;"`
-
----
-
-## 4. Database Initialization
-This command handles three critical steps: generating the TypeSafe client, applying all SQL "patches" (migrations), and inserting mock data.
+### 2. Automated Initialization
+This script automates Docker permissions, Prisma client generation, database migrations, and idempotent data seeding.
 ```bash
-npm run db:setup
+pnpm run db:setup
 ```
 
-
-
----
-
-## 5. Running the Application
-Once the database is synced, start the NestJS server in watch mode:
+### 3. Run the Service
 ```bash
-npm run start:dev
+pnpm run start:dev
 ```
-The API will be available at `http://localhost:3000/api/v1`.
+* **API Entry:** `http://localhost:3000/api/v1`
+* **Interactive Documentation:** `/api/v1/docs` (Swagger/OpenAPI)
 
 ---
 
-# 🛠 Development Workflow
+## 🧪 Testing Strategy (Jest & Docker)
 
-### Changing the Database
-If you need to modify the database structure (e.g., adding a new column):
-1. Update `prisma/schema.prisma`.
-2. Run `npm run migrate:dev`.
-3. Provide a descriptive name for the "patch" (e.g., `add_due_date_to_tasks`).
-4. **Commit** the newly generated folder in `prisma/migrations` to Git.
+Reliability is non-negotiable. This project implements a rigorous testing lifecycle that utilizes dedicated Docker environments to prevent side effects on development data.
 
+| Command | Suite | Focus |
+| :--- | :--- | :--- |
+| `pnpm run test` | **Unit** | Business logic and Service-level isolation. |
+| `pnpm run test:int` | **Integration** | DB Repository patterns and Prisma hooks. |
+| `pnpm run test:e2e` | **E2E** | Full HTTP lifecycle using a dedicated test database. |
 
+> **Note:** Run `pnpm run test:setup` to automatically spin up the `tapos_test` database within your MySQL container before running integration or E2E suites.
 
-### Useful Commands
-| Command | Purpose |
+---
+
+## 🔄 Professional Workflow & CI/CD
+
+This repository is built for **Continuous Integration**. On every pull request or push to `main`, a GitHub Actions workflow executes the following:
+
+1.  **Static Analysis:** Runs **ESLint** for code quality and **Prettier** for formatting.
+2.  **Infrastructure Sync:** Initializes a transient MySQL service in the runner.
+3.  **Automated Validation:** Executes the full Jest test suite.
+4.  **Docker Build & Push:** Compiles a production-ready image and pushes it to Docker Hub.
+5.  **Automated Deployment:** Deploys via SSH to a Singapore-based VPS, performs a health check, and runs zero-downtime migrations.
+
+---
+
+## 🚧 Status & Maintenance
+
+### Known Issues & Incomplete Functionality
+The following areas are currently under development or identified for future optimization:
+
+* **[SLOT: FEATURE/BUG NAME]** — *e.g., Real-time notification socket integration is currently in the architectural phase.*
+* **[SLOT: FEATURE/BUG NAME]** — *e.g., Rate limiting is partially implemented; currently evaluating Redis-based global throttling.*
+* **[SLOT: FEATURE/BUG NAME]** — *e.g., Password recovery flow requires an SMTP provider configuration.*
+
+---
+
+## 📜 Technical Utility Scripts
+
+| Script | Purpose |
 | :--- | :--- |
-| `npm run start:dev` | Starts the API with Hot-Reloading. |
-| `npm run db:setup` | Full reset: Generates client, runs migrations, and seeds data. |
-| `npx prisma studio` | Opens a browser-based UI to view/edit your database data. |
-| `npm run lint` | Runs ESLint to keep code style consistent. |
+| `pnpm run seed` | Idempotent data injection (safe to run multiple times). |
+| `pnpm run db:grant` | Fixes Docker MySQL permission bottlenecks (P3014) automatically. |
+| `pnpm exec prisma studio` | Visual database explorer. |
+| `pnpm run test:all` | Pre-flight check (Lint + Unit + E2E + Build). |
 
-**Is there any specific part of your `tapos` logic (like a specific service or guard) that needs special instructions in this file?**
+---
+
+**Architecture Note:** The project uses **Bcrypt** for secure password hashing and **JWT** for stateless authentication. All responses are standardized via NestJS Interceptors to ensure a consistent API contract for frontend consumers.
