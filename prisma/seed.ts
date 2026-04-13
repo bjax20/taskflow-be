@@ -1,4 +1,4 @@
-import { PrismaClient, TaskStatus } from '@prisma/client';
+import { PrismaClient, TaskStatus } from '../src/generated/client';
 
 const prisma = new PrismaClient();
 
