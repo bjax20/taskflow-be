@@ -54,10 +54,12 @@ export class AuthController {
 
         // Check if setCookie exists (provided by @fastify/cookie)
         if (typeof response.setCookie === "function") {
+            const isProd = process.env.NODE_ENV === "production";
             void response.setCookie("auth_token", result.access_token, {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === "production",
+                secure: isProd,
                 sameSite: "lax",
+                domain: isProd ? ".tapos.work" : "localhost",
                 path: "/",
                 maxAge: 3600,
             });
@@ -71,11 +73,13 @@ export class AuthController {
     public logout(@Res({ passthrough: true }) response: FastifyReply): {
         message: string;
     } {
+        const isProd = process.env.NODE_ENV === "production";
         // In Fastify with @fastify/cookie, we use clearCookie
         void response.clearCookie("auth_token", {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure: isProd,
             sameSite: "lax",
+            domain: isProd ? ".tapos.work" : "localhost",
             path: "/",
         });
 
