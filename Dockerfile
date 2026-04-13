@@ -45,6 +45,7 @@ COPY --from=builder /usr/src/app/node_modules ./node_modules
 # 9. Copy compiled code and metadata
 COPY --from=builder /usr/src/app/dist ./dist
 COPY --from=builder /usr/src/app/package.json ./
+COPY --from=builder /usr/src/app/prisma ./prisma
 
 # Optional: Set user to 'node' for security
 # USER node
