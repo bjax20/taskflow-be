@@ -10,8 +10,8 @@ module.exports = {
     // },
 
     moduleNameMapper: {
-        "^@prisma/client$": "<rootDir>/../../node_modules/@prisma/client",
-        "^src/(.*)$": "<rootDir>/../../src/$1",
+        "^@prisma/client$": "<rootDir>/node_modules/@prisma/client",
+        "^src/(.*)$": "<rootDir>/src/$1",
     },
 
     // CRITICAL: Run tests sequentially to prevent database conflicts
