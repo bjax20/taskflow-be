@@ -26,26 +26,33 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      # 1. Install pnpm first so setup-node can use it for caching
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
+          cache: "pnpm" # Change this from npm to pnpm
 
       - name: Install Dependencies
-        run: npm ci
+        # Use pnpm install with --frozen-lockfile for CI safety
+        run: pnpm install --frozen-lockfile
 
       - name: Run Prisma Generate
-        run: npx prisma generate
+        run: pnpm exec prisma generate
 
       - name: Sync Database Schema
-        run: npx prisma db push --skip-generate
+        run: pnpm exec prisma db push --skip-generate
         env:
-          # Match the password used in the service block above
           DATABASE_URL: mysql://root:test_root_password@localhost:3306/tapos_test
 
       - name: Run Tests (TDD Strict)
-        run: npx jest --config jest.config.ts
+        run: pnpm exec jest --config jest.config.ts
         env:
           NODE_ENV: test
           DATABASE_URL: mysql://root:test_root_password@localhost:3306/tapos_test
@@ -57,7 +64,8 @@ jobs:
           JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
 
       - name: Run E2E Tests
-        run: npx jest --config src/tests/jest-e2e.json --rootDir .
+        # Use pnpm exec to ensure it uses the local jest version
+        run: pnpm exec jest --config src/tests/jest-e2e.json --rootDir .
         env:
           NODE_ENV: test
           DATABASE_URL: mysql://root:test_root_password@localhost:3306/tapos_test
