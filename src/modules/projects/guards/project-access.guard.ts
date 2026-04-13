@@ -4,13 +4,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Request } from 'express';
+import { FastifyRequest } from 'fastify';
 import { ProjectsService } from '../projects.service';
 
 /**
  * Interface handles both /projects/:id and /projects/:projectId/tasks
  */
-interface AuthenticatedRequest extends Request {
+interface AuthenticatedRequest extends FastifyRequest{
   user: {
     userId: string;
   };

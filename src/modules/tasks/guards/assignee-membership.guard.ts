@@ -4,7 +4,7 @@ import {
   ExecutionContext,
   NotFoundException
 } from '@nestjs/common';
-import { Request } from 'express';
+import { FastifyRequest } from 'fastify';
 import { PrismaService } from '../../../../prisma/prisma.service';
 
 @Injectable()
@@ -12,7 +12,7 @@ export class AssigneeMembershipGuard implements CanActivate {
   public constructor(private readonly prisma: PrismaService) {}
 
   public async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<FastifyRequest>();
 
     const params = request.params as Record<string, string>;
     const body = request.body as Record<string, unknown>;

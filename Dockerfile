@@ -9,11 +9,11 @@ RUN npm install -g pnpm
 
 WORKDIR /usr/src/app
 
-# 3. Copy dependency files first for better layer caching
-COPY package.json pnpm-lock.yaml ./
+# 3. Copy dependency files AND .npmrc
+COPY package.json pnpm-lock.yaml .npmrc ./
 COPY prisma ./prisma/
 
-# 4. Strict install
+# 4. Strict install (now respects the hoisting/build-script rules)
 RUN pnpm install --frozen-lockfile
 
 # 5. Copy source and generate Prisma Client inside node_modules
