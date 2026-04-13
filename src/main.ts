@@ -115,7 +115,7 @@ async function bootstrap(): Promise<void> {
             // Required for your findById(Number(id)) logic
         }),
     );
-
+    
     // @ts-expect-error - version mismatch between @fastify/cookie and NestJS Fastify adapter types
     await app.register(fastifyCookie, {
         secret: process.env.JWT_SECRET,

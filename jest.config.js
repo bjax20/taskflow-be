@@ -5,6 +5,10 @@ module.exports = {
     testMatch: ["**/__tests__/**/*.ts", "**/?(*.)+(spec|test).ts"],
     moduleFileExtensions: ["ts", "js", "json"],
     
+    moduleNameMapper: {
+        "^@prisma/client$": "<rootDir>/src/generated/client"
+    },
+    
     // CRITICAL: Run tests sequentially to prevent database conflicts
     maxWorkers: 1,
     

@@ -47,20 +47,21 @@ export class AuthController {
         @Body() loginDto: LoginDto,
         @Res({ passthrough: true }) response: FastifyReply,
     ): Promise<LoginResponse> {
-        // Explicitly type the result to stop the 'Unsafe call' on result.access_token
         const result: LoginResponse = await this.authService.login(
             loginDto.email,
             loginDto.password,
         );
-        // Use the void operator to explicitly mark the floating return as ignored
-        void response.setCookie("auth_token", result.access_token, {
-            httpOnly: true,
-            // Set secure to false for local dev, true for production
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            path: "/",
-            maxAge: 3600,
-        });
+
+        // Check if setCookie exists (provided by @fastify/cookie)
+        if (typeof response.setCookie === "function") {
+            void response.setCookie("auth_token", result.access_token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "lax",
+                path: "/",
+                maxAge: 3600,
+            });
+        }
 
         return result;
     }

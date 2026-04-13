@@ -8,6 +8,7 @@ export const createMockTask = (overrides: Partial<Task> = {}): Task => ({
   status: TaskStatus.TODO,
   projectId: 1,
   assigneeId: 1,
+  position: 1000,
   createdAt: new Date(),
   updatedAt: new Date(),
   ...overrides,

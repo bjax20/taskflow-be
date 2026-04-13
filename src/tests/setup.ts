@@ -1,38 +1,43 @@
-import { PrismaClient } from "@prisma/client";
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 
-// Create a single Prisma instance for all tests
-export const prisma = new PrismaClient({
+import { PrismaClient, Prisma } from "../generated/client";
+
+// Define options with explicit types to help the compiler
+const prismaOptions: Prisma.PrismaClientOptions = {
     log: [
-        {
-            emit: "event",
-            level: "query",
-        },
-        {
-            emit: "stdout",
-            level: "error",
-        },
-        {
-            emit: "stdout",
-            level: "warn",
-        },
+        { emit: "event", level: "query" },
+        { emit: "stdout", level: "error" },
+        { emit: "stdout", level: "warn" },
     ],
-});
+};
 
-// Export cleanDatabase function
+// Export the single Prisma instance for all tests
+export const prisma = new PrismaClient(prismaOptions);
+
+/**
+ * Clean the database between tests.
+ * Using Raw queries and foreign key disabling to ensure a fresh state.
+ */
 export async function cleanDatabase() {
     try {
         await prisma.$executeRawUnsafe("SET FOREIGN_KEY_CHECKS = 0");
 
-        // robust approach: Wrap in try-catch or only delete if tables exist
-        const tables = ["ProjectMember", "Task", "Project", "User", "Changelog"];
+        const tables = [
+            "ProjectMember",
+            "Task",
+            "Project",
+            "User",
+            "Changelog",
+        ];
 
         for (const table of tables) {
             try {
-                // Using executeRaw because it won't crash the whole process
-                // if the Prisma Client hasn't loaded the model yet
+                // Use backticks for table names to handle MySQL reserved words
                 await prisma.$executeRawUnsafe(`DELETE FROM \`${table}\``);
             } catch (e) {
-                // Silently skip if table doesn't exist yet
+                // Skips if table doesn't exist yet
             }
         }
 
@@ -42,41 +47,27 @@ export async function cleanDatabase() {
     }
 }
 
-// Optional: Listen to Prisma query logs for debugging
-// prisma.$on("query", (e) => {
-//     console.log("Query: " + e.query);
-//     console.log("Params: " + JSON.stringify(e.params));
-//     console.log("Duration: " + e.duration + "ms");
-// });
-
-// Global setup - runs once before all tests
+/**
+ * Global setup - runs once before the entire test suite
+ */
 beforeAll(async () => {
     try {
-        // Test connection
+        // Simple heartbeat check
         await prisma.$queryRaw`SELECT 1`;
         console.log("✓ Database connected for tests");
-
-        // Run migrations
-        // Note: Uncomment if using npx prisma migrate in test
-        // const { spawn } = require('child_process');
-        // await new Promise((resolve, reject) => {
-        //     const proc = spawn('npx', ['prisma', 'migrate', 'deploy', '--skip-generate']);
-        //     proc.on('close', resolve);
-        //     proc.on('error', reject);
-        // });
     } catch (error) {
         console.error("Failed to initialize test database:", error);
         throw error;
     }
 });
 
-// Global teardown - runs once after all tests
+/**
+ * Global teardown - runs once after all tests complete
+ */
 afterAll(async () => {
     try {
-        // Ensure foreign keys are re-enabled
+        // Ensure foreign keys are back on before closing
         await prisma.$executeRawUnsafe("SET FOREIGN_KEY_CHECKS = 1");
-
-        // Disconnect
         await prisma.$disconnect();
         console.log("✓ Database disconnected");
     } catch (error) {

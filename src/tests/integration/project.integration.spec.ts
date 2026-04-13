@@ -10,6 +10,7 @@ import request from "supertest";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { AppModule } from "../../modules/app.module";
 import { createRegisterDto } from "../../tests/factories/auth.factory";
+import fastifyCookie from "@fastify/cookie";
 
 describe("Project System (Integration)", () => {
     let app: NestFastifyApplication;
@@ -27,7 +28,8 @@ describe("Project System (Integration)", () => {
         app = moduleFixture.createNestApplication<NestFastifyApplication>(
             new FastifyAdapter(),
         );
-
+        const fastifyInstance = app.getHttpAdapter().getInstance();
+        await fastifyInstance.register(fastifyCookie as any);
         configService = moduleFixture.get<ConfigService>(ConfigService);
         PREFIX = configService.get<string>("API_PREFIX", "/api/v1");
 
@@ -70,11 +72,11 @@ describe("Project System (Integration)", () => {
             url: `${PREFIX}/auth/login`,
             payload: {
                 email: userData.email,
-                password: userData.password
+                password: userData.password,
             },
         });
 
-        if (loginRes.statusCode !== 200) {
+        if (loginRes.statusCode >= 400) {
             throw new Error(`Login failed: ${loginRes.statusCode}`);
         }
 

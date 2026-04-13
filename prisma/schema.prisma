@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../src/generated/client"
 }
 
 datasource db {
@@ -52,6 +53,7 @@ model Task {
   assigneeId  Int?
   assignee    User?       @relation(fields: [assigneeId], references: [id])
   logs        Changelog[]
+  position    Float      @default(0) // Use Float for mid-insertions without re-indexing
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 }
